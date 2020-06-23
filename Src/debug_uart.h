@@ -7,6 +7,7 @@
 
 #define Q_LEN 512           //队列长度
 
+extern char debug_send_buff[Q_LEN];
 
 typedef struct _debug_double_buff
 {

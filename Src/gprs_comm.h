@@ -36,6 +36,12 @@ struct _cmd_list{
 #define AT_CMD_AT_CLOSE_CONNECT "AT+QICLOSE=%d\r\n"    //关闭指定的tcp链接
 #define AT_CMD_AT_QISACK      "AT+QISACK=%d\r\n"        //查询发送的数据
 #define AT_CMD_AT_SEND         "AT+QISEND=%d,%d\r\n"       //发送数据  连接编号 数量
+#define AT_CMD_AT_CGATT         "AT+CGATT?\r\n"       //gprs 附着
+#define AT_CMD_AT_SET_CGATT         "AT+CGATT=1\r\n"       //gprs 附着
+#define AT_CMD_AT_SET_CGREG       "AT+CGREG=1\r\n" 
+
+
+
 
 
 
@@ -43,11 +49,14 @@ struct _cmd_list{
 #define GPRS_ERROR_NO_ATI 						100    //ATI 指令没有回应
 #define GPRS_ERROR_CSQ_ERROR 				    101   //信号强度不达标
 #define GPRS_ERROR_CREG_ERROR 				    102   //基站连接不上
-#define GPRS_ERROR_CONNECT_ERROR     			103   //tcp连接失败
-#define GPRS_ERROR_WAIT_READY_ERROR 			104   //没有等到  >
-#define GPRS_ERROR_RE_CONNECT_3_NO_SENDOK 		105   //发送没有等待send ok
-//#define GPRS_ERROR_NO_ATI 106
-//#define GPRS_ERROR_NO_ATI 107
+#define GPRS_ERROR_CGREG_ERROR            103
+#define GPRS_ERROR_CGATT_ERROR             104
+#define GPRS_ERROR_CONNECT_ERROR     			105   //tcp连接失败
+#define GPRS_ERROR_WAIT_READY_ERROR 			106   //没有等到  >
+#define GPRS_ERROR_RE_CONNECT_3_NO_SENDOK 		107   //发送没有等待send ok
+
+
+
 //#define GPRS_ERROR_NO_ATI 108
 //#define GPRS_ERROR_NO_ATI 109
 //#define GPRS_ERROR_NO_ATI 110
@@ -60,6 +69,7 @@ void callback_fun_cgreg(const char *pstr);
 void callback_fun_csq(const char *pstr);
 void callback_fun_ready_send(const char *pstr);
 void callback_fun_creg(const char *pstr);
+void callback_fun_cgatt(const char *pstr);
 void callback_fun_rdy(const char *pstr);
 void callback_fun_call_ready(const char *pstr);
 void callback_fun_qistate(const char *pstr);
@@ -79,10 +89,13 @@ typedef struct _gprs_stat{
 	unsigned int stop_sec_count;
 	unsigned int send_next_at_cmd_time_ms;	
 	char start_enable;
+	char error_need_to_reboot;
+	unsigned int reboot_times;
 	char error_code;
 	char ati_ok;
 	char creg_ok;       
-	char cgreg_ok;  	
+	char cgreg_ok;  
+	char cgatt_ok;
 	char csq;   
 	char power_status;
 	unsigned int rdy_count;  //
@@ -113,7 +126,7 @@ void start_gprs_mod(void);
 	
 void task_gprs_comm(void);
 
-int32_t gprs_send_data(uint8_t client,void *pdata,uint16_t len,uint32_t cmd);
+int32_t gprs_send_data(uint8_t client,void *pdata,uint16_t len,int32_t *cmd);
 
 
 

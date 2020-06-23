@@ -27,7 +27,7 @@ void rtc_init(void);
 	
 void enter_standby(void);
 	
-
+int32_t make_protocal_data(void);
 
 
 

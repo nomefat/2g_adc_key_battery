@@ -1,7 +1,7 @@
 #ifndef GPRS_APP_H_
 #define GPRS_APP_H_
 
-
+#pragma anon_unions
 
 
 #define GPRS_DATA_BUFF_LENGH 4096      //服务下下发的数据区的buff
@@ -19,6 +19,41 @@
 #define WAKE_UP_POWER          3
 
 
+
+typedef struct _gprs_task_manage
+{
+    struct 
+    {
+        uint8_t send_adc_data_enable;
+        uint8_t task_setp;
+            #define TASK_NONE                       0
+            #define WAIT_ADC_DATA_READY             1
+            #define ADC_DATA_READY                  2
+            #define WAIT_PROCOTAL_HEAD_SEND_OK      3
+            #define PROCOTAL_HEAD_SEND_OK           4
+            #define SEND_ADC_DATA_ING               5
+        uint16_t adc_data_index;
+        uint32_t make_adc_error_times;
+        int32_t error_to_reboot_mod_times;
+    };
+        
+}struct_gprs_task_manage;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 extern uint8_t wake_up_who;   //通过那个方式wakeup
 extern uint8_t task_send_gprs_data_enable;
 
@@ -31,6 +66,22 @@ void task_send_gprs_data(void);
 
 void task_gprs_app(void);
 	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #endif
 
 

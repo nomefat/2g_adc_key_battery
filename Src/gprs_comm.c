@@ -12,8 +12,8 @@
 #define debug(str) copy_string_to_double_buff(str)
 
 
-uint32_t gprs_server_ip = (219<<24)|(239<<16)|(83<<8)|74;
-uint16_t gprs_server_port = 40010;
+uint32_t gprs_server_ip = (101<<24)|(200<<16)|(39<<8)|204;
+uint16_t gprs_server_port = 12346;
 
 
 
@@ -50,6 +50,7 @@ CMD_CALLBACK("+CGREG",callback_fun_cgreg)
 CMD_CALLBACK("+CSQ",callback_fun_csq)
 CMD_CALLBACK(">",callback_fun_ready_send)
 CMD_CALLBACK("+CREG",callback_fun_creg)
+CMD_CALLBACK("+CGATT",callback_fun_cgatt)
 CMD_CALLBACK("RDY",callback_fun_rdy)
 CMD_CALLBACK("+CFUN",callback_fun_cfun)
 CMD_CALLBACK("SMS Ready",callback_fun_sms_ready)
@@ -117,8 +118,10 @@ void gprs_at_tcp_conn(int num,unsigned long ip,unsigned short port)
 {
 
 	memset(at_cmd_conn,0,50);
-	sprintf(at_cmd_conn,"AT+QIOPEN=%d,\"TCP\",\"%d.%d.%d.%d\",%d\r\n",num,ip&0xff,(ip>>8)&0xff,(ip>>16)&0xff,ip>>24,port);
+	sprintf(at_cmd_conn,"AT+QIOPEN=%d,\"TCP\",\"%d.%d.%d.%d\",%d\r\n",num,ip>>24,(ip>>16)&0xff,(ip>>8)&0xff,ip&0xff,port);
+
 	gprs_uart_send_string(at_cmd_conn);
+	debug(at_cmd_conn);
 
 }
 
@@ -171,6 +174,8 @@ void get_data_from_queue(void)
 		if(gprs_stat.rev_client >= 0) //表示下面的数据都是服务器下发的用户数据，写进app缓冲区
 		{
 			gprs_data_write_queue(gprs_stat.rev_client, data);
+			sprintf(debug_send_buff,"%d\r\n",data);
+			debug(debug_send_buff);			
 			for(i=1;i<gprs_stat.rev_len;i++) //数据长度
 			{
 				time_ms = get_ms_count();
@@ -184,22 +189,24 @@ void get_data_from_queue(void)
 						return;
 					}
 				}
-				gprs_data_write_queue(gprs_stat.rev_client, data);					
+				gprs_data_write_queue(gprs_stat.rev_client, data);				
 			}
+			
 			gprs_stat.rev_client = -1;
 			gprs_stat.rev_len = 0;
 			return;				
 		}
 		else //进行AT字符串处理
 		{
-			if(data == '<')  //发送数据
+			if(data == '>')  //发送数据
 			{
 				callback_fun_ready_send(NULL);
 			}
 			else
 			{
-				if(data =='\r' || data == '\n')
+				if(data =='\r')
 				{
+					gprs_str_read_queue(&data);
 					if(j==0) //去掉没有命令实体的回车换行符
 						return;
 					else //缓冲中有完整的命令字符串
@@ -237,6 +244,7 @@ void error_to_stop_gprs_mod(void)
 {
 		uint8_t i;
 	
+		
 		grps_power_off();
 
 		gprs_stat.start_enable = 0;
@@ -244,6 +252,7 @@ void error_to_stop_gprs_mod(void)
 		gprs_stat.ati_ok = 0;
 		gprs_stat.creg_ok = 0;
 		gprs_stat.cgreg_ok = 0;	
+		gprs_stat.cgatt_ok = 0;
 		gprs_stat.csq = 0;   
 		gprs_stat.power_status = 0;
 		gprs_stat.rdy_count = 0;  //
@@ -276,7 +285,8 @@ void stop_gprs_mod(void)
 		gprs_stat.stop_sec_count = get_sec_count();  //记录模块启动时间
 		gprs_stat.ati_ok = 0;
 		gprs_stat.creg_ok = 0;
-		gprs_stat.cgreg_ok = 0;	
+		gprs_stat.cgreg_ok = 0;
+		gprs_stat.cgatt_ok = 0;	
 		gprs_stat.csq = 0;   
 		gprs_stat.power_status = 0;
 		gprs_stat.rdy_count = 0;  //
@@ -304,9 +314,12 @@ void start_gprs_mod(void)
 		gprs_stat.start_enable = 1;
 		gprs_stat.start_sec_count = get_sec_count();  //记录模块启动时间
 		gprs_stat.error_code = 0;
+		gprs_stat.error_need_to_reboot = 0;
+		gprs_stat.reboot_times++;
 		gprs_stat.ati_ok = 0;
 		gprs_stat.creg_ok = 0;
 		gprs_stat.cgreg_ok = 0;	
+		gprs_stat.cgatt_ok = 0;
 		gprs_stat.csq = 0;   
 		gprs_stat.power_status = 0;
 		gprs_stat.rdy_count = 0;  //
@@ -330,6 +343,18 @@ void start_gprs_mod(void)
 void gprs_status_set(void)
 {
 	
+	if(gprs_stat.send_next_at_cmd_time_ms > get_ms_count())  //超时后才会进入
+		return;
+	
+	if(gprs_stat.error_need_to_reboot >0)  //需要复位模块 先检查gprs数据是否发送干净
+	{
+		memset(at_cmd_conn,0,50);
+		sprintf(at_cmd_conn,AT_CMD_AT_QISACK,0);		
+		gprs_uart_send_string(at_cmd_conn);	
+		gprs_stat.send_next_at_cmd_time_ms = get_ms_count() + 1000;
+		return;
+	}
+	
 	if(gprs_stat.start_enable != 1)  //未开机 不做处理
 		return;
 	
@@ -343,8 +368,7 @@ void gprs_status_set(void)
 		return;
 	}
 
-	if(gprs_stat.send_next_at_cmd_time_ms > get_ms_count())  //超时后才会进入
-		return;
+
 	
 	if(gprs_stat.ati_ok == 0)                       
 	{
@@ -382,7 +406,7 @@ void gprs_status_set(void)
 	if(gprs_stat.creg_ok == 0)                           
 	{
 		gprs_stat.send_at_cmd_times++;	
-		if(gprs_stat.send_at_cmd_times>20)  //20秒
+		if(gprs_stat.send_at_cmd_times>20)  //40秒
 		{
 			gprs_stat.error_code = GPRS_ERROR_CREG_ERROR;
 			goto PWR_OFF_MOD;
@@ -390,15 +414,45 @@ void gprs_status_set(void)
 	
 		gprs_uart_send_string(AT_CMD_AT_CREG); 
 
-		gprs_stat.send_next_at_cmd_time_ms = get_ms_count()+1000;   //间隔1秒
+		gprs_stat.send_next_at_cmd_time_ms = get_ms_count()+2000;   //间隔2秒
+		
+		return;
+	}	
+
+	if(gprs_stat.cgreg_ok == 0)                           
+	{
+		gprs_stat.send_at_cmd_times++;	
+		if(gprs_stat.send_at_cmd_times>20)  //40秒
+		{
+			gprs_stat.error_code = GPRS_ERROR_CGREG_ERROR;
+			goto PWR_OFF_MOD;
+		}  
+	
+		gprs_uart_send_string(AT_CMD_AT_CGREG); 
+
+		gprs_stat.send_next_at_cmd_time_ms = get_ms_count()+2000;   //间隔2秒
 		
 		return;
 	}	
 	
+	if(gprs_stat.cgatt_ok == 0)                           
+	{
+		gprs_stat.send_at_cmd_times++;	
+		if(gprs_stat.send_at_cmd_times>2)  //40秒
+		{
+			gprs_stat.error_code = GPRS_ERROR_CGATT_ERROR;
+			goto PWR_OFF_MOD;
+		}  
+		gprs_uart_send_string(AT_CMD_AT_CGATT); 
+		gprs_stat.send_next_at_cmd_time_ms = get_ms_count()+2000;   //间隔2秒
+		
+		return;
+	}		
+	
 	if(gprs_stat.con_client[0].connect_ok == 0) //未连接
 	{
 		gprs_stat.send_at_cmd_times++;		
-		if(gprs_stat.send_at_cmd_times>3)  //15秒
+		if(gprs_stat.send_at_cmd_times>3)  //30秒
 		{
 			gprs_stat.error_code = GPRS_ERROR_CONNECT_ERROR;
 			goto PWR_OFF_MOD;
@@ -406,7 +460,7 @@ void gprs_status_set(void)
 
 		gprs_at_tcp_conn(0,gprs_server_ip,gprs_server_port);
 
-		gprs_stat.send_next_at_cmd_time_ms = get_ms_count()+5000;   //间隔5秒
+		gprs_stat.send_next_at_cmd_time_ms = get_ms_count()+10000;   //间隔10秒
 		
 		return;		
 	}
@@ -426,8 +480,9 @@ void gprs_status_set(void)
 				memset(at_cmd_conn,0,50);
 				sprintf(at_cmd_conn,AT_CMD_AT_SEND,0,gprs_stat.con_client[0].send_data_len);
 				gprs_uart_send_string(at_cmd_conn);	
+				debug(at_cmd_conn);
 				
-				gprs_stat.send_next_at_cmd_time_ms = get_ms_count()+2000;   //间隔2秒	
+				gprs_stat.send_next_at_cmd_time_ms = get_ms_count()+5000;   //间隔2秒	
 				
 			}
 			else if(gprs_stat.con_client[0].send_setp == SEND_STEP_WAIT_SEND_OK) //等待 send ok 超时
@@ -467,7 +522,7 @@ void gprs_status_set(void)
 	return;
 	
 	PWR_OFF_MOD:
-		error_to_stop_gprs_mod();
+		gprs_stat.error_need_to_reboot = 1;
 	
 }
 
@@ -484,17 +539,25 @@ return:  -1, 模块未启动  判断是否执行启动模块: 执行启动返回-1
 		0 发送成功(只是写入buf成功  等待模块自动发送 发送完后会把len 清零)
 
 */
-int32_t gprs_send_data(uint8_t client,void *pdata,uint16_t len,uint32_t cmd)
+int32_t gprs_send_data(uint8_t client,void *pdata,uint16_t len,int32_t *cmd)
 {
 	int32_t ret;
 	
 	if(gprs_stat.start_enable == 0) //模块未启动
 	{
-		if(gprs_stat.error_code != 0 && gprs_stat.stop_sec_count != 0)  //上次被异常关闭
+		if(gprs_stat.reboot_times>1)  //上次被异常关闭
 		{
-			return -99;  
+			if(*cmd > 0) //强制重启
+			{
+				(*cmd)--;
+				sprintf(debug_send_buff,"4g_set:force reboot mod times=%d\r\n",gprs_stat.reboot_times);
+				debug(debug_send_buff);				
+			}
+			else
+				return -99;  //如果不强制重启模块  就进入休眠模式
 		}
-		start_gprs_mod();
+		if((get_sec_count()-2) > gprs_stat.stop_sec_count)
+			start_gprs_mod();
 		return -1;
 	}
 	
@@ -507,6 +570,8 @@ int32_t gprs_send_data(uint8_t client,void *pdata,uint16_t len,uint32_t cmd)
 	{
 		memcpy(gprs_stat.con_client[0].send_data_buff,pdata,len);
 		gprs_stat.con_client[0].send_data_len = len;
+		sprintf(debug_send_buff,"4g_set:send to buf=%d\r\n",len);
+		debug(debug_send_buff);
 		ret = 0;
 	}
 	else
@@ -548,10 +613,26 @@ void callback_fun_at_ok(const char *pstr)
 
 void callback_fun_cgreg(const char *pstr)
 {
-	char *start_str = "4g_get:cgreg ok\r\n";
-	gprs_stat.cgreg_ok = 1;
-	gprs_stat.send_at_cmd_times = 0;
-	debug(start_str);		
+	
+	uint32_t param,param1;
+	
+	if(pstr[0] != 0)
+		sscanf(pstr,"%d,%d",&param,&param1);
+
+	sprintf(debug_send_buff,"4g_get:cgreg=%d %d\r\n",param,param1);
+	debug(debug_send_buff);		
+	
+	if(param1 == 1 || param1 == 5)	
+	{
+		gprs_stat.cgreg_ok = 1;
+		gprs_stat.send_at_cmd_times = 0;
+	}
+	else
+	{
+		gprs_uart_send_string(AT_CMD_AT_SET_CGREG);
+		debug(AT_CMD_AT_SET_CGREG);	
+	}
+
 }
 
 
@@ -634,7 +715,7 @@ void callback_fun_sendok(const char *pstr)
 	gprs_stat.con_client[0].no_send_ok_times = 0;
 	gprs_stat.con_client[0].re_connect_to_send_times = 0;
 	gprs_stat.con_client[0].send_data_len = 0;
-	gprs_stat.send_next_at_cmd_time_ms = 0;
+	gprs_stat.send_next_at_cmd_time_ms = 100;
 
 	debug(start_str);		
 }
@@ -648,13 +729,38 @@ void callback_fun_qistate(const char *pstr)
 
 void callback_fun_qisack(const char *pstr)
 {
+	uint32_t send_len,ack_len,noack_len;
+
+	if(pstr[0] != 0)
+		sscanf(pstr,"%d,%d,%d",&send_len,&ack_len,&noack_len);
+
+	sprintf(debug_send_buff,"4g_get:send_len=%d ack_len=%d noack_len=%d\r\n",send_len,ack_len,noack_len);
+	debug(debug_send_buff);		
+	
+	if(noack_len == 0)
+	{
+		
+		if(gprs_stat.error_need_to_reboot == 1)
+			error_to_stop_gprs_mod();
+		else
+			stop_gprs_mod();
+		gprs_stat.error_need_to_reboot = 0;
+	}
 	
 }
 
 
 void callback_fun_receive(const char *pstr)
 {
+	uint32_t client,len;
+
+	if(pstr[0] != 0)
+		sscanf(pstr,"%d,%d",&client,&len);
 	
+	gprs_stat.rev_len = len;
+	gprs_stat.rev_client = client;
+	sprintf(debug_send_buff,"4g_get:receive %d len=%d\r\n",client,len);
+	debug(debug_send_buff);	
 }
 
 
@@ -681,7 +787,7 @@ void callback_fun_0_connect_ok(const char *pstr)
 void callback_fun_0_connect_fail(const char *pstr)
 {
 	char *start_str = "4g_get:client:0 connect fail\r\n";
-
+	gprs_stat.send_next_at_cmd_time_ms = 0;
 	debug(start_str);	
 }  
 
@@ -723,6 +829,27 @@ void callback_fun_sms_ready(const char *pstr)
 
 
 
-
+void callback_fun_cgatt(const char *pstr)
+{
+	uint32_t param;
+	
+	if(pstr[0] != 0)
+		sscanf(pstr,"%d",&param);
+	
+	if(param == 1)
+	{
+		gprs_stat.cgatt_ok = 1;
+		debug("4g_get:+cagtt = 1\r\n");	
+		gprs_uart_send_string(AT_CMD_AT_QIMUX); 
+		gprs_stat.send_next_at_cmd_time_ms = get_ms_count()+100;   
+	}
+	else
+	{
+		gprs_uart_send_string(AT_CMD_AT_SET_CGATT);
+		debug("4g_get:+cagtt = 0\r\n");		
+		debug(AT_CMD_AT_SET_CGATT);	
+		gprs_stat.send_next_at_cmd_time_ms = get_ms_count()+1000;   //间隔0.1秒
+	}
+}
 
 

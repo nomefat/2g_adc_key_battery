@@ -1,17 +1,26 @@
 #include "main.h"
+#include "rtc.h"
+#include "debug_uart.h"
+#include "stdio.h"
+
+
+#define debug(str) copy_string_to_double_buff(str)
 
 
 
+
+
+extern ADC_HandleTypeDef hadc1;
 
 extern TIM_HandleTypeDef htim4;
 	
-	
+extern	struct_sys_time sys_time;  //系统时间 包括秒和毫秒
 
 typedef struct _adc_data
 {
 	uint8_t flag;
-	uint16_t index;
-	uint16_t len;
+volatile	uint16_t index;
+volatile 	uint16_t len;
 	int16_t *px;
 	int16_t *py;
 	int16_t *pz;	
@@ -27,21 +36,22 @@ uint8_t protocal_data_buf[1024*16];
 
 
 
-
+int16_t get_adc_value_bigendian(uint32_t channel);
 
 
 
 
 uint8_t xor_fun(uint8_t *pdata,uint16_t len)
 {
-	uint16_t i;
+	uint16_t i = 0;
 	uint8_t ret = 0;
 	
-	ret = pdata[i];
-	for(i=1;i<len;i++)
+	
+	for(i=0;i<len;i++)
 	{
 		ret ^= pdata[i];
 	}
+	return ret;
 }
 
 // 编码选择服务指令，固定12字节
@@ -75,7 +85,7 @@ int encodeServiceSelectCommand(char *memory)
 	
 		memory[p] = xor_fun(&memory[4],p-4);
 		
-    memory[0] = p-4;	
+    memory[3] = p-4;	
 }
 
 
@@ -134,10 +144,10 @@ int encodeAccelerationStoreCommand(uint8_t *memory, char *serialNumber, char *mo
     memory[p++] = (timestamp >> 8) & 0xFF;
     memory[p++] = (timestamp >> 0) & 0xFF;
 
-    // TEMPERATURE = 温度值 (UINT16)
+    // TEMPERATURE = 温度值 (INT16)
     memory[p++] = 0x04; // TIMESTAMP
     memory[p++] = 0x01;
-    memory[p++] = 0x05; // UINT16
+    memory[p++] = 0x02; // INT16
     memory[p++] = 0x00; // 暂时为0
     memory[p++] = 0x00;
 
@@ -201,25 +211,28 @@ int encodeAccelerationStoreCommand(uint8_t *memory, char *serialNumber, char *mo
 		p_adc_data->flag = 1;
 		p_adc_data->index = 0;
 		
-    memory[0] = (p-4)>>8;	
-    memory[1] = p-4;		
+    memory[2] = (p-4)>>8;	
+    memory[3] = p-4;		
 }
 
 
 
 
-void make_protocal_data(void)
+int32_t make_protocal_data(void)
 {
-	uint32_t len;
+	uint16_t xor_index;
+
 	char *serialNumber = "901200600001";
 	char *model = "ZN0111";
 
 	unsigned int timestamp = 1591613193; // Unix 时间戳，精确到秒,UTC时间。
 	unsigned int samplingRate = 2500; // 采样率
-	int samplingCount = 100; // 采集2048个点
+	int samplingCount = 2500; // 采集2500个点
 
 
+  timestamp = make_unix_sec(sys_time.sDate, sys_time.sTime);
 
+  encodeServiceSelectCommand((char *)protocal_data_head);
 
 	encodeAccelerationStoreCommand(protocal_data_buf, serialNumber, model, timestamp, samplingRate, samplingCount,&adc_data);
 
@@ -228,12 +241,22 @@ void make_protocal_data(void)
 	if(adc_data.px != NULL && adc_data.px != NULL && adc_data.px != NULL && adc_data.len != 0 && adc_data.flag == 1)
 	{
 		HAL_TIM_Base_Start_IT(&htim4);
-		while(adc_data.len > adc_data.index);
+		while(adc_data.len > adc_data.index)
+		{
+			
+		}
 		
+    xor_index = (protocal_data_buf[2]<<8) + protocal_data_buf[3] + 4;
+    protocal_data_buf[xor_index] = xor_fun(&protocal_data_buf[4],xor_index-4);
 		
-		
+    return 0;
 		
 	}
+  else
+  {
+    return -1;
+  }
+  
 
 
 
@@ -249,17 +272,54 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	{
 		if(adc_data.index < adc_data.len)
 		{
-			adc_data.px[adc_data.index] = 
-			adc_data.py[adc_data.index] =
-			adc_data.pz[adc_data.index] =
-			
+			adc_data.px[adc_data.index] = get_adc_value_bigendian(ADC_CHANNEL_15);
+			adc_data.py[adc_data.index] = get_adc_value_bigendian(ADC_CHANNEL_8);
+			adc_data.pz[adc_data.index] = get_adc_value_bigendian(ADC_CHANNEL_9);
+			//adc_data.px[adc_data.index] = 0x0101;
+			//adc_data.py[adc_data.index] = 0x0102;
+			//adc_data.pz[adc_data.index] = 0x0103;		
+			sprintf(debug_send_buff,"adc_get:%d %d %d\r\n",(adc_data.px[adc_data.index]>>8)|((adc_data.px[adc_data.index]<<8)&0xff00),(adc_data.py[adc_data.index]>>8)|((adc_data.py[adc_data.index]<<8)&0xff00),(adc_data.pz[adc_data.index]>>8)|((adc_data.pz[adc_data.index]<<8)&0xff00));
+			debug(debug_send_buff);	
 			adc_data.index++;
 		}
 		else
 		{
+			HAL_GPIO_WritePin(SENSOR_PWR_CTRL_GPIO_Port,SENSOR_PWR_CTRL_Pin,GPIO_PIN_RESET);
 			HAL_TIM_Base_Stop_IT(&htim4);
 		}
 	}
 }
 
 
+int16_t get_adc_value_bigendian(uint32_t channel)
+{
+
+
+	int16_t ret;
+	
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /** Configure Regular Channel 
+  */
+  sConfig.Channel = channel;
+  sConfig.Rank = ADC_REGULAR_RANK_1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+	HAL_ADC_Start(&hadc1);
+	HAL_ADC_PollForConversion(&hadc1,10); //等待转换完成，第二个参数表示超时时间，单位ms 
+	if(HAL_IS_BIT_SET(HAL_ADC_GetState(&hadc1), HAL_ADC_STATE_REG_EOC))
+	{
+		ret =  HAL_ADC_GetValue(&hadc1);
+		ret = (ret>>8) | ((ret<<8)&0xff00);
+	} 
+	else
+	{
+		ret =  0;
+	}
+	return ret;
+
+}
