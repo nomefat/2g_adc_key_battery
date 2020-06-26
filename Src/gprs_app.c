@@ -108,7 +108,7 @@ void task_send_gprs_data(void)
 	uint16_t len;
 
 
-	adc_protocal_len = (protocal_data_buf[2]<<8) + protocal_data_buf[3] + 5;
+
 	
 	if(ms > get_ms_count())
 		return;
@@ -122,9 +122,10 @@ void task_send_gprs_data(void)
 	
 	if(gprs_task_manage.send_adc_data_enable == 1)  //查询到有发送adc数据的任务
 	{
+		adc_protocal_len = (protocal_data_buf[2]<<8) + protocal_data_buf[3] + 5;		
 		if(gprs_task_manage.task_setp == TASK_NONE) //第一步 准备adc数据
 		{
-			if(make_protocal_data() == 0)
+			if(make_adc_protocal_data() == 0)
 			{
 				gprs_task_manage.task_setp = ADC_DATA_READY;
 			}
@@ -181,7 +182,7 @@ void task_send_gprs_data(void)
 			sprintf(debug_send_buff,"4g_set:send adc data ok len=%d\r\n",gprs_task_manage.adc_data_index);
 			debug(debug_send_buff);		
 			gprs_stat.error_need_to_reboot = 2;
-	
+			gprs_stat.error_need_to_reboot_sec = get_sec_count();	
 			gprs_task_manage.send_adc_data_enable = 0;
 			gprs_task_manage.task_setp = 0;
 			gprs_task_manage.adc_data_index = 0;

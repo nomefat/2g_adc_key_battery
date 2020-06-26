@@ -39,9 +39,9 @@ struct _cmd_list{
 #define AT_CMD_AT_CGATT         "AT+CGATT?\r\n"       //gprs 附着
 #define AT_CMD_AT_SET_CGATT         "AT+CGATT=1\r\n"       //gprs 附着
 #define AT_CMD_AT_SET_CGREG       "AT+CGREG=1\r\n" 
+#define AT_CMD_AT_QNTP           "AT+QNTP\r\n"
 
-
-
+#define AT_CMD_AT_CCLK           "AT+CCLK?\r\n"
 
 
 
@@ -83,6 +83,11 @@ void callback_fun_error(const char *pstr);
 void callback_fun_cfun(const char *pstr);
 void callback_fun_sms_ready(const char *pstr);
 void callback_fun_sendok(const char *pstr);
+void callback_fun_qntp(const char *pstr);
+void callback_fun_cclk(const char *pstr);
+
+
+
 
 typedef struct _gprs_stat{
 	unsigned int start_sec_count;
@@ -90,12 +95,14 @@ typedef struct _gprs_stat{
 	unsigned int send_next_at_cmd_time_ms;	
 	char start_enable;
 	char error_need_to_reboot;
+	unsigned int error_need_to_reboot_sec;   //超时后 就算数据没有发送完 也必须关闭模块了
 	unsigned int reboot_times;
 	char error_code;
 	char ati_ok;
 	char creg_ok;       
 	char cgreg_ok;  
 	char cgatt_ok;
+	char qntp_ok;
 	char csq;   
 	char power_status;
 	unsigned int rdy_count;  //

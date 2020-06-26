@@ -140,7 +140,7 @@ void rtc_alarm_enable(void)
 		led_ctrl(LED_G,LED_ON);	
 		copy_string_to_double_buff("wake up from rtc alarm\r\n");
 	}	
-	
+	copy_string_to_double_buff("now get rtc alarm no wake up\r\n");
 	
 	
 	
@@ -152,7 +152,8 @@ void rtc_alarm_enable(void)
 
 void rtc_init(void)
 {
-
+	
+	HAL_PWR_DisableWakeUpPin(PWR_WAKEUP_PIN1);
 	HAL_RTCEx_SetSecond_IT(&hrtc);
 	HAL_RTCEx_RTCEventCallback(&hrtc);
 	set_alarm_it();
@@ -182,6 +183,8 @@ void enter_standby(void)
 	led_ctrl(LED_G,LED_OFF);
 	led_ctrl(LED_B,LED_OFF);	
 	
+	HAL_PWR_EnableWakeUpPin(PWR_WAKEUP_PIN1);
+	__HAL_PWR_CLEAR_FLAG(PWR_FLAG_WU);
 	HAL_PWR_EnterSTANDBYMode();
 	
 	

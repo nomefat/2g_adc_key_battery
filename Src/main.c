@@ -131,6 +131,7 @@ int main(void)
 	
 	sys_print();
 	
+  //start_gprs_mod();
   /* USER CODE END 2 */
 
   /* Infinite loop */

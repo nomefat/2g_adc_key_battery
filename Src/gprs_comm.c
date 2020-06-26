@@ -63,6 +63,8 @@ CMD_CALLBACK("ERROR",callback_fun_error)
 CMD_CALLBACK("+QISTATE" , callback_fun_qistate) //:0CMD_CALLBACK(
 CMD_CALLBACK("+QISACK",callback_fun_qisack)          //:SUCCESS,0,0,19,callback_fun_help)
 CMD_CALLBACK("SEND OK",callback_fun_sendok)          //:SUCCESS,0,0,19,callback_fun_help)
+CMD_CALLBACK("+QNTP",callback_fun_qntp)  
+CMD_CALLBACK("+CCLK",callback_fun_cclk)
 CMD_CALLBACK_LIST_END
 
 
@@ -236,6 +238,10 @@ void get_data_from_queue(void)
 	
 }
 
+void enable_stop_gprs_mod(uint8_t code)
+{
+	
+}
 
 
 
@@ -346,8 +352,20 @@ void gprs_status_set(void)
 	if(gprs_stat.send_next_at_cmd_time_ms > get_ms_count())  //超时后才会进入
 		return;
 	
+
 	if(gprs_stat.error_need_to_reboot >0)  //需要复位模块 先检查gprs数据是否发送干净
 	{
+		if(get_sec_count() - gprs_stat.error_need_to_reboot_sec > 50)  //50秒都没法完 认为发送失败
+		{
+			if(gprs_stat.error_need_to_reboot == 1)
+				error_to_stop_gprs_mod();
+			else if(gprs_stat.error_need_to_reboot == 2)
+				stop_gprs_mod();
+
+			led_ctrl(LED_G,LED_OFF);
+			gprs_stat.error_need_to_reboot = 0;		
+			return;	
+		}
 		memset(at_cmd_conn,0,50);
 		sprintf(at_cmd_conn,AT_CMD_AT_QISACK,0);		
 		gprs_uart_send_string(at_cmd_conn);	
@@ -357,7 +375,8 @@ void gprs_status_set(void)
 	
 	if(gprs_stat.start_enable != 1)  //未开机 不做处理
 		return;
-	
+
+	led_flash(LED_G);	
 	if(gprs_stat.power_status !=1)  //开机模块自动发送一些指令，收到后记录为已开始工作
 	{
 		if(get_sec_count() - gprs_stat.start_sec_count >10) //超时未启动
@@ -523,6 +542,7 @@ void gprs_status_set(void)
 	
 	PWR_OFF_MOD:
 		gprs_stat.error_need_to_reboot = 1;
+		gprs_stat.error_need_to_reboot_sec = get_sec_count();
 	
 }
 
@@ -742,8 +762,10 @@ void callback_fun_qisack(const char *pstr)
 		
 		if(gprs_stat.error_need_to_reboot == 1)
 			error_to_stop_gprs_mod();
-		else
+		else if(gprs_stat.error_need_to_reboot == 2)
 			stop_gprs_mod();
+
+		led_ctrl(LED_G,LED_OFF);
 		gprs_stat.error_need_to_reboot = 0;
 	}
 	
@@ -804,6 +826,9 @@ void callback_fun_0_closed(const char *pstr)
 //:SUCCESS,1,20,4
 void callback_fun_error(const char *pstr)
 {
+	char *start_str = "4g_get:error\r\n";
+
+	debug(start_str);
 }
 
 
@@ -822,6 +847,7 @@ void callback_fun_cfun(const char *pstr)
 
 void callback_fun_sms_ready(const char *pstr)
 {
+	gprs_uart_send_string(AT_CMD_AT_QNTP);
 	gprs_stat.power_status = 1;
 	char *start_str = "4g_get:sms ready\r\n";
 	debug(start_str);	
@@ -851,5 +877,47 @@ void callback_fun_cgatt(const char *pstr)
 		gprs_stat.send_next_at_cmd_time_ms = get_ms_count()+1000;   //间隔0.1秒
 	}
 }
+
+
+void callback_fun_qntp(const char *pstr)
+{
+	uint32_t param;
+	
+	if(pstr[0] != 0)
+		sscanf(pstr,"%d",&param);
+	
+	if(param == 0)
+	{
+		gprs_uart_send_string(AT_CMD_AT_CCLK);
+		debug("4g_get:qntp ok\r\n");		
+		debug(AT_CMD_AT_CCLK);			
+		gprs_stat.qntp_ok = 1;
+	}	
+
+}
+
+
+void callback_fun_cclk(const char *pstr)
+{
+	uint32_t year,month,day,hour,min,sec;
+	
+	if(pstr[0] != 0)
+		sscanf(pstr,"\"%d/%d/%d,%d:%d:%d+",&year,&month,&day,&hour,&min,&sec);
+	
+	if(1)
+	{
+		sprintf(debug_send_buff,"4g_get:%d/%d/%d %d:%d:%d\r\n",year,month,day,hour,min,sec);
+		debug(debug_send_buff);			
+		
+	}
+
+}
+
+
+
+
+
+
+
 
 
