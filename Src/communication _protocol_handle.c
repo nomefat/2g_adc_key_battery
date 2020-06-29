@@ -21,14 +21,15 @@ uint8_t * p_uint8;
 uint16_t * p_uint16;
 uint32_t * p_uint32;
 float * p_float32;
-double float * p_float64;
+double * p_float64;
 uint8_t * p_bin;
 int8_t * p_string;
 
 
 
 
-const void *VR_data_ptr[] = {p_int8,p_int16,p_int32,p_uint8,p_uint16,p_uint32,p_float32,p_float64,p_bin,p_string,}
+void *VR_data_ptr[10];
+
 
 
 
@@ -76,9 +77,11 @@ int encodeServiceSelectCommand(char *memory)
     memory[p++] = 0xF0; // ASTROLOGY_ACCELERATION_STORE
     memory[p++] = 0x00;
 	
-	memory[p] = xor_fun(&memory[4],p-4);
+		memory[p] = xor_fun((uint8_t *)&memory[4],p-4);
 		
     memory[3] = p-4;	
+		
+		return 0;
 }
 
 
@@ -86,7 +89,8 @@ int encodeServiceSelectCommand(char *memory)
 // 编码数据上传指令，变长:82+6*N字节，N为采样点数。
 // 三轴，每轴2048采样点时，固定12370字节
 int encodeAccelerationStoreCommand(uint8_t *memory, char *serialNumber, char *model, unsigned int timestamp,
-                                   unsigned int samplingRate, int samplingCount,struct_adc_data *p_adc_data) {
+                                   unsigned int samplingRate, int samplingCount,struct_adc_data *p_adc_data) 
+{
     int p = 0;
 		int i = 0;
 		
@@ -206,6 +210,8 @@ int encodeAccelerationStoreCommand(uint8_t *memory, char *serialNumber, char *mo
     
     memory[2] = (p-4)>>8;	
     memory[3] = p-4;		
+		
+		return 0;
 }
 
 
@@ -223,17 +229,31 @@ void protocol_data_handle(void *pdata,uint16_t len)
 {
     uint16_t i = 0;
     uint16_t data_index = 0;
-    struct_iod *p_iod;
+    uint16_t data_set_count;
+		struct_data_set *p_data_set;
+		uint8_t *p = pdata;
+	
+		VR_data_ptr[0] = p_int8;
+		VR_data_ptr[1] = p_int16;
+		VR_data_ptr[2] = p_int32;
+		VR_data_ptr[3] = p_uint8;
+		VR_data_ptr[4] = p_uint16;
+		VR_data_ptr[5] = p_uint32;
+		VR_data_ptr[6] = p_float32;
+		VR_data_ptr[7] = p_float64;
+		VR_data_ptr[8] = p_bin;
+		VR_data_ptr[9] = p_string;	
 
-    p_iod = struct_iod *pdata;
+    data_set_count = (p[0]<<8) + ((uint8_t *)pdata)[1] ;
 
     data_index  = 2;
-    for(i=0;i<p_iod->data_set_count;i++)
+    for(i=0;i<data_set_count;i++)
     {
-        p_iod->p_data_set = (struct_data_set *)&pdata[data_index];
-        switch(p_iod->p_data_set->tag)
+        p_data_set = (struct_data_set *)(&p[data_index]);
+        switch(p_data_set->tag)
         {
-            case 
+					case TAG_CMD:
+						break;
         }
         
     }

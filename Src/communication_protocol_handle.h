@@ -50,34 +50,25 @@ typedef struct _data_set
 
 
 
-typedef struct _iod
-{
-    uint16_t data_set_count;
-    struct_data_set *p_data_set;
-}struct_iod;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 #pragma pack()
 
 
+
+extern uint8_t protocal_data_head[32];
+
+extern uint8_t protocal_data_buf[1024*16];
+
+
+
+int encodeServiceSelectCommand(char *memory) ;
+
+int encodeAccelerationStoreCommand(uint8_t *memory, char *serialNumber, char *model, unsigned int timestamp,
+                                   unsigned int samplingRate, int samplingCount,struct_adc_data *p_adc_data) ;
+
+
+uint8_t xor_fun(uint8_t *pdata,uint16_t len);
 
 
 #endif
