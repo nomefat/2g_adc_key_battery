@@ -46,9 +46,9 @@ int32_t make_adc_protocal_data(void)
 	int samplingCount = 2500; // 采集2500个点
 
 
-  timestamp = make_unix_sec(sys_time.sDate, sys_time.sTime);
+  	timestamp = make_unix_sec(sys_time.sDate, sys_time.sTime);
 
-  encodeServiceSelectCommand((char *)protocal_data_head);
+  	encodeServiceSelectCommand((char *)protocal_data_head);
 
 	encodeAccelerationStoreCommand(protocal_data_buf, serialNumber, model, timestamp, samplingRate, samplingCount,&adc_data);
 
@@ -68,10 +68,10 @@ int32_t make_adc_protocal_data(void)
     return 0;
 		
 	}
-  else
-  {
-    return -1;
-  }
+	else
+	{
+		return -1;
+	}
   
 
 
@@ -109,21 +109,19 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 int16_t get_adc_value_bigendian(uint32_t channel)
 {
-
-
 	int16_t ret;
 	
-  ADC_ChannelConfTypeDef sConfig = {0};
+	ADC_ChannelConfTypeDef sConfig = {0};
 
-  /** Configure Regular Channel 
-  */
-  sConfig.Channel = channel;
-  sConfig.Rank = ADC_REGULAR_RANK_1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
+	/** Configure Regular Channel 
+	 */
+	sConfig.Channel = channel;
+	sConfig.Rank = ADC_REGULAR_RANK_1;
+	sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
+	if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+	{
+	Error_Handler();
+	}
 
 	HAL_ADC_Start(&hadc1);
 	HAL_ADC_PollForConversion(&hadc1,10); //等待转换完成，第二个参数表示超时时间，单位ms 
@@ -139,3 +137,15 @@ int16_t get_adc_value_bigendian(uint32_t channel)
 	return ret;
 
 }
+
+
+
+
+
+
+
+
+
+
+
+void 

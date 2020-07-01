@@ -175,7 +175,7 @@ void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *hrtc)
 }
 
 
-//进入休眠模式
+//进入休眠模式,RTC闹钟和按键会唤醒系统
 void enter_standby(void)
 {
 	stop_gprs_mod();
@@ -186,11 +186,26 @@ void enter_standby(void)
 	HAL_PWR_EnableWakeUpPin(PWR_WAKEUP_PIN1);
 	__HAL_PWR_CLEAR_FLAG(PWR_FLAG_WU);
 	HAL_PWR_EnterSTANDBYMode();
-	
-	
+		
 }
 
 
+
+
+//进入关机模式 按键会唤醒系统
+void enter_stop(void)
+{
+	stop_gprs_mod();
+	led_ctrl(LED_R,LED_OFF);
+	led_ctrl(LED_G,LED_OFF);
+	led_ctrl(LED_B,LED_OFF);	
+	
+	
+	HAL_PWR_EnableWakeUpPin(PWR_WAKEUP_PIN1);
+	__HAL_PWR_CLEAR_FLAG(PWR_FLAG_WU);
+	HAL_PWR_EnterSTANDBYMode();
+		
+}
 
 
 

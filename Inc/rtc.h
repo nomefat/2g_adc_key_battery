@@ -29,7 +29,7 @@ void enter_standby(void);
 	
 int32_t make_protocal_data(void);
 
-
+void enter_stop(void);
 
 
 
