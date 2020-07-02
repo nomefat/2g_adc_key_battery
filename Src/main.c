@@ -32,7 +32,7 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
+extern void work(void);
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -151,6 +151,8 @@ int main(void)
 		task_gprs_app();
 		
 		task_debug();
+
+    work();
 		
   }
   /* USER CODE END 3 */

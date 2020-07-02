@@ -27,7 +27,7 @@ typedef struct _adc_data
 
 
 
-
+int32_t make_adc_protocal_data(void);
 
 
 

@@ -433,6 +433,11 @@
               <FileType>1</FileType>
               <FilePath>..\Src\boot.c</FilePath>
             </File>
+            <File>
+              <FileName>work_mode.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Src\work_mode.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

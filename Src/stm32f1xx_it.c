@@ -28,7 +28,7 @@
 #include "debug_uart.h"
 
 extern void button_scan(void);
-extern void sys_start_led_flash(void);
+extern void sys_status_led_flash(void);
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -202,7 +202,7 @@ void SysTick_Handler(void)
 	sys_time.ms++;
 	sys_time.ms_count++;
 	button_scan();
-	sys_start_led_flash();	
+	sys_status_led_flash();	
   /* USER CODE END SysTick_IRQn 0 */
   HAL_IncTick();
   /* USER CODE BEGIN SysTick_IRQn 1 */

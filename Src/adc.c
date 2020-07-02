@@ -19,8 +19,11 @@ extern TIM_HandleTypeDef htim4;
 	
 extern	struct_sys_time sys_time;  //系统时间 包括秒和毫秒
 
+extern struct_adc_data_param adc_data_param; 
 
+extern uint8_t adc_data_buf[1024*32];
 
+extern uint8_t send_data_buf[1500];
 
 struct_adc_data adc_data;
 
@@ -36,7 +39,6 @@ int16_t get_adc_value_bigendian(uint32_t channel);
 
 int32_t make_adc_protocal_data(void)
 {
-	uint16_t xor_index;
 
 	char *serialNumber = "901200600001";
 	char *model = "ZN0111";
@@ -48,35 +50,36 @@ int32_t make_adc_protocal_data(void)
 
   	timestamp = make_unix_sec(sys_time.sDate, sys_time.sTime);
 
-  	encodeServiceSelectCommand((char *)protocal_data_head);
-
-	encodeAccelerationStoreCommand(protocal_data_buf, serialNumber, model, timestamp, samplingRate, samplingCount,&adc_data);
 
 
+  	//encodeServiceSelectCommand((char *)protocal_data_head);
 
-	if(adc_data.px != NULL && adc_data.px != NULL && adc_data.px != NULL && adc_data.len != 0 && adc_data.flag == 1)
+	//encodeAccelerationStoreCommand(protocal_data_buf, serialNumber, model, timestamp, samplingRate, samplingCount,&adc_data);
+	//在这里初始化所有参数
+
+	adc_data_param.dev_sampling_rate = 2500;
+
+	adc_data.px = (int16_t *)adc_data_buf;
+	adc_data.py = (int16_t *)(adc_data_buf+adc_data_param.dev_sampling_rate*2);
+	adc_data.pz = (int16_t *)(adc_data_buf+adc_data_param.dev_sampling_rate*4);
+
+    adc_data.len = adc_data_param.dev_sampling_rate;
+    adc_data.flag = 1;
+    adc_data.index = 0;
+
+	if(adc_data.px != NULL && adc_data.py != NULL && adc_data.pz != NULL && adc_data.len != 0 && adc_data.flag == 1)
 	{
 		HAL_TIM_Base_Start_IT(&htim4);
 		while(adc_data.len > adc_data.index)
 		{
 			
-		}
-		
-    xor_index = (protocal_data_buf[2]<<8) + protocal_data_buf[3] + 4;
-    protocal_data_buf[xor_index] = xor_fun(&protocal_data_buf[4],xor_index-4);
-		
-    return 0;
-		
+		}	
+    	return 0;	
 	}
 	else
 	{
 		return -1;
 	}
-  
-
-
-
-
 
 }
 
@@ -146,6 +149,3 @@ int16_t get_adc_value_bigendian(uint32_t channel)
 
 
 
-
-
-void 

@@ -21,7 +21,7 @@ const uint16_t monDays[12] = {0,31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 3
  
 extern RTC_HandleTypeDef hrtc;
 
-
+uint8_t rtc_alarm_minuter = 10;
 
 //秒中断回调函数
 void HAL_RTCEx_RTCEventCallback(RTC_HandleTypeDef *hrtc)
@@ -114,14 +114,31 @@ void set_alarm_it(void)
 {
 	RTC_AlarmTypeDef sAlarm; 
 	
-	sAlarm.AlarmTime.Hours = sys_time.sTime.Hours;
-	sAlarm.AlarmTime.Minutes = (sys_time.sTime.Minutes+10)/10*10;
-	if(sAlarm.AlarmTime.Minutes == 60)
+	if(rtc_alarm_minuter == 10)
 	{
-		sAlarm.AlarmTime.Minutes = 0;
-		sAlarm.AlarmTime.Hours++;
-		if(sAlarm.AlarmTime.Hours>23)
-			sAlarm.AlarmTime.Hours = 0;
+		sAlarm.AlarmTime.Hours = sys_time.sTime.Hours;
+		sAlarm.AlarmTime.Minutes = (sys_time.sTime.Minutes+10)/10*10;
+		if(sAlarm.AlarmTime.Minutes == 60)
+		{
+			sAlarm.AlarmTime.Minutes = 0;
+			sAlarm.AlarmTime.Hours++;
+			if(sAlarm.AlarmTime.Hours>23)
+				sAlarm.AlarmTime.Hours = 0;
+		}
+	}
+	else if(rtc_alarm_minuter == 30)
+	{
+		if(sys_time.sTime.Minutes<30)
+		{	
+			sAlarm.AlarmTime.Minutes = 30;				
+		}
+		else if(sys_time.sTime.Minutes>=30)
+		{
+			sAlarm.AlarmTime.Hours = sys_time.sTime.Hours+1;	
+			sAlarm.AlarmTime.Minutes = 0;	
+			if(sAlarm.AlarmTime.Hours>23)
+				sAlarm.AlarmTime.Hours = 0;	
+		}
 	}
 	sAlarm.AlarmTime.Seconds = 0;
 
@@ -134,13 +151,13 @@ void set_alarm_it(void)
 void rtc_alarm_enable(void)
 {
 	
-	if(wake_up_who == WAKE_UP_POWER && sys_time.ms_count < 2000)
+	if(wake_up_who == WAKE_UP_POWER)
 	{
 		wake_up_who = WAKE_UP_RTC_ALARM;
-		led_ctrl(LED_G,LED_ON);	
 		copy_string_to_double_buff("wake up from rtc alarm\r\n");
-	}	
-	copy_string_to_double_buff("now get rtc alarm no wake up\r\n");
+	}
+	else	
+		copy_string_to_double_buff("now get rtc alarm no wake up\r\n");
 	
 	
 	

@@ -12,10 +12,11 @@
 #define debug(str) copy_string_to_double_buff(str)
 
 
-uint32_t gprs_server_ip = (101<<24)|(200<<16)|(39<<8)|204;
-uint16_t gprs_server_port = 12346;
+//uint32_t gprs_server_ip = (101<<24)|(200<<16)|(39<<8)|204;
+//uint16_t gprs_server_port = 12346;
 
-
+uint32_t gprs_server_ip = (219<<24)|(239<<16)|(83<<8)|74;
+uint16_t gprs_server_port = 40010;
 
 
   
@@ -758,15 +759,8 @@ void callback_fun_qisack(const char *pstr)
 	debug(debug_send_buff);		
 	
 	if(noack_len == 0)
-	{
-		
-		if(gprs_stat.error_need_to_reboot == 1)
-			error_to_stop_gprs_mod();
-		else if(gprs_stat.error_need_to_reboot == 2)
-			stop_gprs_mod();
-
-		led_ctrl(LED_G,LED_OFF);
-		gprs_stat.error_need_to_reboot = 0;
+	{		
+		wait_2g_adc_data_send_ok();
 	}
 	
 }
