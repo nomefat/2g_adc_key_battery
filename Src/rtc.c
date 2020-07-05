@@ -10,7 +10,9 @@
 
 
 
+uint8_t btn_event = 0;
 
+volatile uint8_t wake_up_who = WAKE_UP_POWER;   //通过那个方式wakeup
 
 
 
@@ -20,6 +22,7 @@ const uint8_t Days[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 const uint16_t monDays[12] = {0,31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
  
 extern RTC_HandleTypeDef hrtc;
+extern uint8_t bule_switch;  //蓝牙关闭
 
 uint8_t rtc_alarm_minuter = 10;
 
@@ -199,9 +202,11 @@ void enter_standby(void)
 	led_ctrl(LED_R,LED_OFF);
 	led_ctrl(LED_G,LED_OFF);
 	led_ctrl(LED_B,LED_OFF);	
+	HAL_GPIO_WritePin(SENSOR_PWR_CTRL_GPIO_Port,SENSOR_PWR_CTRL_Pin,GPIO_PIN_RESET);	
 	
 	HAL_PWR_EnableWakeUpPin(PWR_WAKEUP_PIN1);
 	__HAL_PWR_CLEAR_FLAG(PWR_FLAG_WU);
+	__disable_irq();
 	HAL_PWR_EnterSTANDBYMode();
 		
 }
@@ -216,10 +221,11 @@ void enter_stop(void)
 	led_ctrl(LED_R,LED_OFF);
 	led_ctrl(LED_G,LED_OFF);
 	led_ctrl(LED_B,LED_OFF);	
-	
+	HAL_GPIO_WritePin(SENSOR_PWR_CTRL_GPIO_Port,SENSOR_PWR_CTRL_Pin,GPIO_PIN_RESET);	
 	
 	HAL_PWR_EnableWakeUpPin(PWR_WAKEUP_PIN1);
 	__HAL_PWR_CLEAR_FLAG(PWR_FLAG_WU);
+	__disable_irq();
 	HAL_PWR_EnterSTANDBYMode();
 		
 }
@@ -228,7 +234,98 @@ void enter_stop(void)
 
 
 
+extern uint8_t power_off_flag;
+void button_scan(void)
+{
+	 static uint32_t down_ms = 0;
+	 static uint32_t up_ms = 0;	
+	
+	if(HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_0) == GPIO_PIN_RESET) //松开
+	{
+		up_ms++;
+		if(up_ms > 100) //判断为松开按键
+		{
+			if(down_ms > 2000) //长按键
+			{
+				btn_event = BTN_LONG_EVENT;
+				down_ms = 0;		
+			}
+			else if(down_ms > 100) //短按键
+			{
+				if(get_ms_count() < 2000) //按键只是激活设备
+				{
+					wake_up_who = WAKE_UP_KEY;
+				}				
+				btn_event = BTN_SHORT_EVENT;	
+				down_ms = 0;			
+			}
+			up_ms = 0;	
+		}
+	}
+	else  //按下
+	{
+		down_ms++;
+		
+		if(down_ms > 2000) //长按键
+		{				
+			power_off_flag = 1;
+			led_ctrl(LED_G,LED_OFF);	
+			led_ctrl(LED_R,LED_OFF);
+			led_ctrl(LED_B,LED_OFF);			
+		}
+		else if(down_ms > 100 ) //短按键
+		{					
+			up_ms = 0;	
+			led_ctrl(LED_R,LED_ON);			
+		}
+	}
+	
+}
 
+
+
+void btn_handle(void)
+{
+
+	
+	if(btn_event == BTN_LONG_EVENT) //长按键
+	{
+		btn_event = 0;
+		if(get_ms_count() < 10000)
+		{
+			power_off_flag = 0;
+			return;		
+		}
+		power_off_flag = 1;
+		enter_standby();
+	}
+	else if(btn_event == BTN_SHORT_EVENT)  //短按键
+	{
+		btn_event = 0;
+		if(get_ms_count() < 10000)
+			return;				
+		if(get_ms_count() < 2000) //按键只是激活设备
+		{
+			
+		}
+		else    // 工作时候的按键 进行蓝牙开启或关闭
+		{
+			/* code */
+			if(bule_switch)
+			{
+				bule_switch = 0;
+				led_ctrl(LED_B,LED_OFF);
+			}
+			else
+			{
+				bule_switch = 1;
+			}
+			
+		}
+		
+	}
+	
+}
 
 
 

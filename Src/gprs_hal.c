@@ -125,15 +125,15 @@ void led_ctrl(uint8_t led,uint8_t stat)
 
 void led_flash(uint8_t led )
 {
-	if(LED_R)
+	if(led==LED_R)
 	{
 		HAL_GPIO_TogglePin(LED_R_GPIO_Port,LED_R_Pin);
 	}
-	else 	if(LED_G)
+	else 	if(led==LED_G)
 	{
 		HAL_GPIO_TogglePin(LED_G_GPIO_Port,LED_G_Pin);
 	}
-	else 	if(LED_B)
+	else 	if(led==LED_B)
 	{
 		HAL_GPIO_TogglePin(LED_B_GPIO_Port,LED_B_Pin);
 	}

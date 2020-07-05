@@ -356,7 +356,7 @@ void gprs_status_set(void)
 
 	if(gprs_stat.error_need_to_reboot >0)  //需要复位模块 先检查gprs数据是否发送干净
 	{
-		if(get_sec_count() - gprs_stat.error_need_to_reboot_sec > 50)  //50秒都没法完 认为发送失败
+		if(get_sec_count() - gprs_stat.error_need_to_reboot_sec > 30)  //30秒都没法完 认为发送失败
 		{
 			if(gprs_stat.error_need_to_reboot == 1)
 				error_to_stop_gprs_mod();
@@ -603,7 +603,12 @@ int32_t gprs_send_data(uint8_t client,void *pdata,uint16_t len,int32_t *cmd)
 	return ret;
 }
 
-
+void gprs_get_aisack(void)
+{
+		memset(at_cmd_conn,0,50);
+		sprintf(at_cmd_conn,AT_CMD_AT_QISACK,0);		
+		gprs_uart_send_string(at_cmd_conn);		
+}
 
 
 void task_gprs_comm(void)
@@ -736,7 +741,7 @@ void callback_fun_sendok(const char *pstr)
 	gprs_stat.con_client[0].no_send_ok_times = 0;
 	gprs_stat.con_client[0].re_connect_to_send_times = 0;
 	gprs_stat.con_client[0].send_data_len = 0;
-	gprs_stat.send_next_at_cmd_time_ms = 100;
+	gprs_stat.send_next_at_cmd_time_ms = 500;
 
 	debug(start_str);		
 }
@@ -760,6 +765,8 @@ void callback_fun_qisack(const char *pstr)
 	
 	if(noack_len == 0)
 	{		
+		if(gprs_stat.error_need_to_reboot == 1)
+			error_to_stop_gprs_mod();		
 		wait_2g_adc_data_send_ok();
 	}
 	

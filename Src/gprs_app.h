@@ -14,9 +14,10 @@
 #define BTN_SHORT_EVENT 1
 
 
+#define WAKE_UP_POWER          0
 #define WAKE_UP_KEY            1
 #define WAKE_UP_RTC_ALARM      2
-#define WAKE_UP_POWER          3
+
 
 
 
@@ -53,7 +54,7 @@ typedef struct _gprs_task_manage
 
 
 
-extern uint8_t wake_up_who;   //通过那个方式wakeup
+extern volatile uint8_t wake_up_who;   //通过那个方式wakeup
 extern uint8_t task_send_gprs_data_enable;
 
 int8_t gprs_data_write_queue(uint8_t c,uint8_t data);

@@ -33,6 +33,7 @@
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 extern void work(void);
+extern void dead_in_key_down(void);
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -127,11 +128,15 @@ int main(void)
   MX_CRC_Init();
   /* USER CODE BEGIN 2 */
 	
+
+	
 	start_from_gprs_dma_receive();
 		
 	start_from_debug_dma_receive();
 	
 	rtc_init();
+
+	dead_in_key_down();  //按键唤醒系统的时候 死在按键按下里
 	
 	sys_print();
 	

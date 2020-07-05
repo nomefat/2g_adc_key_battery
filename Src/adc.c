@@ -70,6 +70,7 @@ int32_t make_adc_protocal_data(void)
 	if(adc_data.px != NULL && adc_data.py != NULL && adc_data.pz != NULL && adc_data.len != 0 && adc_data.flag == 1)
 	{
 		HAL_TIM_Base_Start_IT(&htim4);
+		HAL_GPIO_WritePin(SENSOR_PWR_CTRL_GPIO_Port,SENSOR_PWR_CTRL_Pin,GPIO_PIN_SET);
 		while(adc_data.len > adc_data.index)
 		{
 			

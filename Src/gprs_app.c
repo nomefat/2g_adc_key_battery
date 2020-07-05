@@ -22,9 +22,7 @@ uint8_t gprs_data_buff_client[CLIENT_COUNT][GPRS_DATA_BUFF_LENGH];
 
 uint8_t task_send_gprs_data_enable = 0;
 
-uint8_t btn_event = 0;
 
-uint8_t wake_up_who = WAKE_UP_POWER;   //通过那个方式wakeup
 
 struct_gprs_task_manage gprs_task_manage;
 
@@ -206,7 +204,8 @@ void task_send_gprs_data(void)
 		}
 		else if(gprs_task_manage.task_setp == WAIT_PROCOTAL_SEND_OK) //等待发送OK
 		{
-
+				gprs_get_aisack();
+				ms = get_ms_count() + 1000;
 		}
 	}
 }
@@ -269,92 +268,6 @@ void task_2g_rev_data_handle(void)
 }
 
 
-void button_scan(void)
-{
-	 static uint32_t down_ms = 0;
-	 static uint32_t up_ms = 0;	
-	
-	if(HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_0) == GPIO_PIN_RESET) //松开
-	{
-		up_ms++;
-		if(up_ms > 100) //判断为松开按键
-		{
-			if(down_ms > 2000) //长按键
-			{
-				btn_event = BTN_LONG_EVENT;
-				down_ms = 0;		
-			}
-			else if(down_ms > 100) //短按键
-			{
-				if(wake_up_who == WAKE_UP_POWER)
-				{
-					wake_up_who = WAKE_UP_KEY;
-					copy_string_to_double_buff("wake up from key\r\n");
-				}
-				else
-				{
-					led_ctrl(LED_R,LED_OFF);
-				}
-				btn_event = BTN_SHORT_EVENT;	
-				down_ms = 0;			
-			}
-			up_ms = 0;	
-		}
-	}
-	else  //按下
-	{
-		down_ms++;
-		if(down_ms > 2000) //长按键
-		{	
-			led_ctrl(LED_G,LED_OFF);	
-			led_ctrl(LED_R,LED_OFF);
-			led_ctrl(LED_B,LED_OFF);			
-		}
-		else if(down_ms > 100) //短按键
-		{
-			up_ms = 0;	
-			led_ctrl(LED_R,LED_ON);			
-		}
-	}
-	
-}
-
-
-
-
-
-void btn_handle(void)
-{
-	if(btn_event == BTN_LONG_EVENT) //长按键
-	{
-		btn_event = 0;
-		enter_standby();
-	}
-	else if(btn_event == BTN_SHORT_EVENT)  //短按键
-	{
-		btn_event = 0;
-		if(get_ms_count() < 2000) //按键只是激活设备
-		{
-			
-		}
-		else    // 工作时候的按键 进行蓝牙开启或关闭
-		{
-			/* code */
-			if(bule_switch)
-			{
-				bule_switch = 0;
-				led_ctrl(LED_B,LED_OFF);
-			}
-			else
-			{
-				bule_switch = 1;
-			}
-			
-		}
-		
-	}
-	
-}
 
 
 void start_2g_send_adc_data_task(void)

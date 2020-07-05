@@ -135,7 +135,7 @@ void task_gprs_comm(void);
 
 int32_t gprs_send_data(uint8_t client,void *pdata,uint16_t len,int32_t *cmd);
 
-
+void gprs_get_aisack(void);
 
 
 

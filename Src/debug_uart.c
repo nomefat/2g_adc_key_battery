@@ -239,9 +239,12 @@ struct _cmd_param_int* get_str_param(char *param)
 
 void sys_print(void)
 {
-
-	copy_string_to_double_buff("Sensor_V2.0 start\r\n");
-
+	if(wake_up_who == WAKE_UP_KEY)
+		copy_string_to_double_buff("Sensor_V2.0 start Key\r\n");
+	else if(wake_up_who == WAKE_UP_POWER)
+		copy_string_to_double_buff("Sensor_V2.0 start Power\r\n");
+	else if(wake_up_who == WAKE_UP_RTC_ALARM)
+		copy_string_to_double_buff("Sensor_V2.0 start Rtc Alarm\r\n");	
 }
 
 void help(char *param)
@@ -249,6 +252,13 @@ void help(char *param)
 	copy_string_to_double_buff("*******************************************************\r\n\
 Sensor_V2.0 cmd help\r\n"
 );
+
+	if(wake_up_who == WAKE_UP_KEY)
+		copy_string_to_double_buff("wake up Key\r\n");
+	else if(wake_up_who == WAKE_UP_POWER)
+		copy_string_to_double_buff("wake up Power\r\n");
+	else if(wake_up_who == WAKE_UP_RTC_ALARM)
+		copy_string_to_double_buff("wake up Rtc Alarm\r\n");	
 
 }
 
