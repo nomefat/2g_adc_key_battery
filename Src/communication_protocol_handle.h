@@ -141,7 +141,7 @@ uint16_t MB_CRC16(uint8_t *_pushMsg,uint8_t _usDataLen);
 void handle_2g_progocol(void *pdata);
 
 
-
+uint16_t MB_CRC16(uint8_t *_pushMsg,uint8_t _usDataLen);
 
 
 

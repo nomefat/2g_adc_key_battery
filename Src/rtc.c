@@ -24,6 +24,8 @@ const uint16_t monDays[12] = {0,31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 3
 extern RTC_HandleTypeDef hrtc;
 extern uint8_t bule_switch;  //蓝牙关闭
 
+extern void if_need_write_param(void);
+	
 uint8_t rtc_alarm_minuter = 10;
 
 //秒中断回调函数
@@ -198,6 +200,9 @@ void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *hrtc)
 //进入休眠模式,RTC闹钟和按键会唤醒系统
 void enter_standby(void)
 {
+	if_need_write_param();
+	if_need_write_param();
+	if_need_write_param();	
 	stop_gprs_mod();
 	led_ctrl(LED_R,LED_OFF);
 	led_ctrl(LED_G,LED_OFF);

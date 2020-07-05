@@ -34,6 +34,7 @@
 /* USER CODE BEGIN PTD */
 extern void work(void);
 extern void dead_in_key_down(void);
+extern void read_param(void);
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -128,7 +129,7 @@ int main(void)
   MX_CRC_Init();
   /* USER CODE BEGIN 2 */
 	
-
+	read_param();
 	
 	start_from_gprs_dma_receive();
 		

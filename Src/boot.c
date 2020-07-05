@@ -44,6 +44,7 @@ typedef struct _firmware_protocol_head
 #define STORE_FIRMWARE_ADDR (0X08000000+16*1024+100*1024)   	//¹Ì¼þ´æ·ÅµØÖ·
 
 
+
 struct_firmware_head *p_firmware_head = (struct_firmware_head *)STORE_FIRMWARE_ADDR;
 
 extern CRC_HandleTypeDef hcrc;
@@ -149,8 +150,6 @@ int32_t crc_firmware(uint32_t len)
 	return crc_value;
 
 }
-
-
 
 
 

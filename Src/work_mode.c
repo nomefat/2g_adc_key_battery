@@ -8,6 +8,14 @@
 #include "rtc.h"
 #include "debug_uart.h"
 #include "stdio.h"
+#include "communication_protocol_handle.h"
+
+
+
+
+#pragma anon_unions
+
+#define PARAM_ADDR (0X08000000+16*1024+200*1024)   	//固件存放地址
 
 #define CHANGE_STOP_MAX_SEND_PACKET_COUNT 10
 #define AUTO_STUDY_MAX_SEND_PACKET_COUNT  200
@@ -21,16 +29,26 @@ extern uint8_t rtc_alarm_minuter;
 
 typedef struct _work_mode
 {
-    uint8_t mode;
+		uint16_t len;
+		#define LEN_PARAM       6
+		uint16_t crc;
+    struct
+    {
+        uint8_t mode:4;
         #define NO_ACTIVATE     0                   //未激活模式
         #define AUTO_STUDY      1                   //自动学习模式
         #define NORMAL_WORK     2                   //正常工作模式
-
-		uint8_t dev_check_start_or_stop;           //现在检测到机器是启动还是停止的状态
-			#define MECHINE_START    1
-			#define MECHINE_STOP     2
-		uint8_t change_stop_send_adc_data_packet_count;  //机器停止后上传的包数  大于10次后停止上传
-		uint16_t auto_study_send_adc_data_packet_count;  //自动学习状态上传200包后转为正常工作状态
+			uint8_t dev_stat:4;       					//表示设备是开机还是关机状态
+			#define DEV_RUNING 0                 //开机
+			#define DEV_STOPING 1              //关机
+    };
+    uint8_t dev_check_start_or_stop;           //现在检测到机器是启动还是停止的状态
+        #define MECHINE_START    1
+        #define MECHINE_STOP     2
+    uint8_t change_stop_send_adc_data_packet_count;  //机器停止后上传的包数  大于10次后停止上传
+    uint16_t auto_study_send_adc_data_packet_count;  //自动学习状态上传200包后转为正常工作状态
+		uint8_t nothing;
+		
     struct _no_activate_mode
     {
         int8_t send_adc_data_count;                 //发送数据的次数  
@@ -327,6 +345,101 @@ void dead_in_key_down(void)
 		
 }
 
+//擦除参数存储区
+HAL_StatusTypeDef erase_param_store(void)
+{
+	FLASH_EraseInitTypeDef EraseInit;
+	HAL_StatusTypeDef HAL_Status;
+	uint32_t PageError;
+	
+	EraseInit.PageAddress = PARAM_ADDR;
+	EraseInit.Banks = FLASH_BANK_1;
+	EraseInit.TypeErase = FLASH_TYPEERASE_PAGES;
+	EraseInit.NbPages = 1;
+	
+	HAL_FLASH_Unlock();
+	HAL_Status = HAL_FLASHEx_Erase(&EraseInit, &PageError);	
+	HAL_FLASH_Lock();
+	
+	return HAL_Status;
+	
+}
+
+
+int32_t write_param(void)
+{
+	uint16_t i,half_word_len;
+	HAL_StatusTypeDef HAL_Status;
+	uint8_t *p_data = (uint8_t *)&work_mode;
+	uint8_t *p_readback_data = (uint8_t *)PARAM_ADDR;
+	
+	work_mode.len = LEN_PARAM;
+	work_mode.crc = MB_CRC16(((uint8_t *)(&(work_mode.crc)))+2,LEN_PARAM);
+
+	erase_param_store();
+
+	half_word_len = (work_mode.len+4)/2;
+	for(i = 0;i<half_word_len;i++)
+	{
+		HAL_Status =  HAL_FLASH_Program(FLASH_TYPEPROGRAM_HALFWORD, PARAM_ADDR, p_data[i]);	
+		if(p_readback_data[i] !=  p_data[i])
+		{
+			HAL_Status =  HAL_FLASH_Program(FLASH_TYPEPROGRAM_HALFWORD, PARAM_ADDR, p_data[i]);	
+			if(p_readback_data[i] !=  p_data[i])
+			{
+				HAL_Status =  HAL_FLASH_Program(FLASH_TYPEPROGRAM_HALFWORD, PARAM_ADDR, p_data[i]);	
+				return -1;
+			}
+		}
+	}
+	return 0;
+}
+
+void if_need_write_param(void)
+{
+	uint16_t i,half_word_len;
+	uint8_t *p_data = (uint8_t *)&work_mode;
+	uint8_t *p_readback_data = (uint8_t *)PARAM_ADDR;
+	half_word_len = (work_mode.len+4)/2;
+	
+	for(i = 0;i<half_word_len;i++)
+	{
+		if(p_readback_data[i] !=  p_data[i])	
+		{
+			if(write_param() == 0)
+			{
+				return;
+			}
+		}
+	}
+}
+
+
+void read_param(void)
+{
+	struct_work_mode *p_param_flash = (struct_work_mode *)PARAM_ADDR;
+	
+	if(p_param_flash->len > 2048)
+	{
+		goto WRITE_PARAM;
+	}
+	if(MB_CRC16(((uint8_t *)(&(p_param_flash->crc)))+2,LEN_PARAM) != p_param_flash->crc)
+	{
+		goto WRITE_PARAM;
+	}		
+	
+	memcpy(&work_mode,p_param_flash,LEN_PARAM);
+	return;
+	
+WRITE_PARAM:
+	work_mode.mode = NO_ACTIVATE;
+	work_mode.dev_stat = DEV_STOPING;
+	work_mode.auto_study_send_adc_data_packet_count = 0;
+	work_mode.change_stop_send_adc_data_packet_count = 0;
+	work_mode.dev_check_start_or_stop = MECHINE_STOP;
+
+	write_param();
+}
 
 
 
