@@ -377,7 +377,6 @@ void gprs_status_set(void)
 	if(gprs_stat.start_enable != 1)  //未开机 不做处理
 		return;
 
-	led_flash(LED_G);	
 	if(gprs_stat.power_status !=1)  //开机模块自动发送一些指令，收到后记录为已开始工作
 	{
 		if(get_sec_count() - gprs_stat.start_sec_count >10) //超时未启动
