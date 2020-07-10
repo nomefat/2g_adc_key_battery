@@ -4,7 +4,7 @@
 #include "debug_uart.h"
 #include "gprs_comm.h"
 #include "gprs_hal.h"
-
+#include "stdio.h"
 
 
 
@@ -169,7 +169,15 @@ void rtc_alarm_enable(void)
 	
 }
 
+void print_date_time(void)
+{
+	HAL_RTC_GetTime(&hrtc,&sys_time.sTime,RTC_FORMAT_BIN);
+	HAL_RTC_GetDate(&hrtc,&sys_time.sDate,RTC_FORMAT_BIN);
 
+	sprintf(debug_send_buff,"DT:%d-%d-%d %d:%d:%d\r\n",sys_time.sDate.Year+2000,sys_time.sDate.Month,sys_time.sDate.Date,
+		sys_time.sTime.Hours,sys_time.sTime.Minutes,sys_time.sTime.Seconds);
+	debug(debug_send_buff);
+}
 
 
 void rtc_init(void)

@@ -4,7 +4,9 @@
 #include "string.h"
 #include "math.h"
 #include "gprs_app.h"
-
+#include "work_mode.h"
+#include "stdio.h"
+#include "rtc.h"
 
 extern UART_HandleTypeDef huart1;
 
@@ -239,13 +241,20 @@ struct _cmd_param_int* get_str_param(char *param)
 
 void sys_print(void)
 {
+	char *mode[] = {"no activate","atuo_study","work","blue"};
+	char * s[] = {"runing","stop"};
+	
 	if(wake_up_who == WAKE_UP_KEY)
-		copy_string_to_double_buff("Sensor_V2.0 start Key\r\n");
+		copy_string_to_double_buff("Sensor_V2.0 start Key");
 	else if(wake_up_who == WAKE_UP_POWER)
-		copy_string_to_double_buff("Sensor_V2.0 start Power\r\n");
+		copy_string_to_double_buff("Sensor_V2.0 start Power");
 	else if(wake_up_who == WAKE_UP_RTC_ALARM)
-		copy_string_to_double_buff("Sensor_V2.0 start Rtc Alarm\r\n");	
+		copy_string_to_double_buff("Sensor_V2.0 start Rtc Alarm");	
+
+	sprintf(debug_send_buff,"work_mode:%s %s \r\n",mode[work_mode.mode],s[work_mode.dev_stat]);
+	copy_string_to_double_buff(debug_send_buff);	
 }
+
 
 void help(char *param)
 {
@@ -260,6 +269,7 @@ Sensor_V2.0 cmd help\r\n"
 	else if(wake_up_who == WAKE_UP_RTC_ALARM)
 		copy_string_to_double_buff("wake up Rtc Alarm\r\n");	
 
+
 }
 
 void cmd_gprs_send(char *param)
@@ -270,11 +280,29 @@ void cmd_gprs_send(char *param)
 	
 }
 
+void cmd_mode_reset(char *param)
+{
+	work_mode.mode = NO_ACTIVATE;	//测试用 强制保持未激活
+	work_mode.dev_stat = DEV_STOPING;
+	work_mode.no_activate_mode.rev_if_activate_cmd = NEED_ACTIVATE;
+	enter_standby();
+	copy_string_to_double_buff("start gprs send \r\n");
+	
+}
+
+
+
+
+
+
+
 //在此处添加你的命令字符串和回调函数
 CMD_CALLBACK_LIST_BEGIN
 
 CMD_CALLBACK("?",help)		
 CMD_CALLBACK("gprs_send",cmd_gprs_send)
+CMD_CALLBACK("reset",cmd_mode_reset)
+
 
 CMD_CALLBACK_LIST_END
 

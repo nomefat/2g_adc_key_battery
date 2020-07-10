@@ -31,7 +31,7 @@ int32_t make_protocal_data(void);
 
 void enter_stop(void);
 
-
+void print_date_time(void);
 
 
 

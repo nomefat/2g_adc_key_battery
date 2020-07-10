@@ -28,6 +28,8 @@ typedef struct _gprs_task_manage
         int8_t send_adc_data_enable;
             #define ENABLE_SEND                  1
             #define SEND_OK                      2
+        uint16_t sid_cmd;
+        uint8_t adc_data_type;
         uint8_t task_setp;
             #define TASK_NONE                       0
             #define WAIT_ADC_DATA_READY             1
@@ -35,19 +37,12 @@ typedef struct _gprs_task_manage
             #define WAIT_PROCOTAL_SEND_OK           3           
         uint32_t make_adc_error_times;
         int32_t error_to_reboot_mod_times;
+
     };
         
+    int8_t send_activate_data_enable;
+   
 }struct_gprs_task_manage;
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -69,11 +64,11 @@ void task_gprs_app(void);
 
 int8_t get_2g_send_adc_data_stat(void);
 
-void start_2g_send_adc_data_task(void);
+void start_2g_send_adc_data_task(uint16_t sid_cmd,uint8_t adc_data_type);
 
 void wait_2g_adc_data_send_ok(void);
 
-
+int8_t get_2g_send_activate_data_stat(void);
 
 
 

@@ -4,7 +4,7 @@
 #include "stdio.h"
 #include "adc.h"
 #include "communication_protocol_handle.h"
-
+#include "work_mode.h"
 
 
 #define debug(str) copy_string_to_double_buff(str)
@@ -34,36 +34,42 @@ struct_adc_data adc_data;
 int16_t get_adc_value_bigendian(uint32_t channel);
 
 
+uint16_t to_big_endian_uint16(uint16_t d)
+{
+	return ((d>>8) | (d<<8));
+}
+
+uint32_t to_big_endian_uint32(uint32_t d)
+{
+	return (((d>>24) & 0xff) | ((d>>8) & 0xff00) | ((d<<8) & 0xff0000) | ((d<<24) & 0xff000000));
+}
+
+uint16_t to_small_endian_uint16(uint16_t d)
+{
+	return ((d>>8) | (d<<8));
+}
+
+uint32_t to_small_endian_uint32(uint32_t d)
+{
+	return (((d>>24) & 0xff) | ((d>>8) & 0xff00) | ((d<<8) & 0xff0000) | ((d<<24) & 0xff000000));
+}
+
 
 
 
 int32_t make_adc_protocal_data(void)
 {
 
-	char *serialNumber = "901200600001";
-	char *model = "ZN0111";
-
-	unsigned int timestamp = 1591613193; // Unix 时间戳，精确到秒,UTC时间。
 	unsigned int samplingRate = 2500; // 采样率
 	int samplingCount = 2500; // 采集2500个点
 
-
-  	timestamp = make_unix_sec(sys_time.sDate, sys_time.sTime);
-
-
-
-  	//encodeServiceSelectCommand((char *)protocal_data_head);
-
-	//encodeAccelerationStoreCommand(protocal_data_buf, serialNumber, model, timestamp, samplingRate, samplingCount,&adc_data);
-	//在这里初始化所有参数
-
-	adc_data_param.dev_sampling_rate = 2500;
+	adc_data_param.dev_sampling_rate = to_big_endian_uint32(2500);
 
 	adc_data.px = (int16_t *)adc_data_buf;
-	adc_data.py = (int16_t *)(adc_data_buf+adc_data_param.dev_sampling_rate*2);
-	adc_data.pz = (int16_t *)(adc_data_buf+adc_data_param.dev_sampling_rate*4);
+	adc_data.py = (int16_t *)(adc_data_buf+to_small_endian_uint32(adc_data_param.dev_sampling_rate)*2);
+	adc_data.pz = (int16_t *)(adc_data_buf+to_small_endian_uint32(adc_data_param.dev_sampling_rate)*4);
 
-    adc_data.len = adc_data_param.dev_sampling_rate;
+    adc_data.len = to_small_endian_uint32(adc_data_param.dev_sampling_rate);
     adc_data.flag = 1;
     adc_data.index = 0;
 

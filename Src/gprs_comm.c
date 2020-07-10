@@ -7,16 +7,16 @@
 #include "gprs_comm.h"
 #include "rtc.h"
 #include "debug_uart.h"
+#include "communication_protocol_handle.h"
 
 
-#define debug(str) copy_string_to_double_buff(str)
 
 
-//uint32_t gprs_server_ip = (101<<24)|(200<<16)|(39<<8)|204;
-//uint16_t gprs_server_port = 12346;
+uint32_t gprs_server_ip = (101<<24)|(200<<16)|(39<<8)|204;
+uint16_t gprs_server_port = 20008;
 
-uint32_t gprs_server_ip = (219<<24)|(239<<16)|(83<<8)|74;
-uint16_t gprs_server_port = 40010;
+//uint32_t gprs_server_ip = (219<<24)|(239<<16)|(83<<8)|74;
+//uint16_t gprs_server_port = 40010;
 
 
   
@@ -38,7 +38,7 @@ char at_cmd_str_buf[GPRS_AT_STR_REV_LEN];   //容纳一行读的AT字符串
   
 extern char debug_send_buff[Q_LEN];
 	
- 
+extern struct_adc_data_param adc_data_param;  //adc数据块的一些参数 
  
 int gprs_print_rx_tx_data_enable = 0;   
 
@@ -56,9 +56,15 @@ CMD_CALLBACK("RDY",callback_fun_rdy)
 CMD_CALLBACK("+CFUN",callback_fun_cfun)
 CMD_CALLBACK("SMS Ready",callback_fun_sms_ready)
 CMD_CALLBACK("Call Ready",callback_fun_call_ready)
+#ifdef ONE_CLIENT
+CMD_CALLBACK("CONNECT OK",callback_fun_0_connect_ok)      //+CIPOPEN:SUCCESS,1
+CMD_CALLBACK("CONNECT FAIL" ,callback_fun_0_connect_fail)      //:SUCCESS
+CMD_CALLBACK("CLOSED",callback_fun_0_closed)    //:SUCCESS,1,20,4
+#else
 CMD_CALLBACK("0, CONNECT OK",callback_fun_0_connect_ok)      //+CIPOPEN:SUCCESS,1
 CMD_CALLBACK("0, CONNECT FAIL" ,callback_fun_0_connect_fail)      //:SUCCESS
 CMD_CALLBACK("0, CLOSED",callback_fun_0_closed)    //:SUCCESS,1,20,4
+#endif
 CMD_CALLBACK("+RECEIVE",callback_fun_receive)  //:0
 CMD_CALLBACK("ERROR",callback_fun_error)
 CMD_CALLBACK("+QISTATE" , callback_fun_qistate) //:0CMD_CALLBACK(
@@ -117,12 +123,17 @@ void gprs_str_copy_to_queue(unsigned short len,char* p_data)
 
 
 char at_cmd_conn[50];
-void gprs_at_tcp_conn(int num,unsigned long ip,unsigned short port)
+void gprs_at_tcp_conn(int num,unsigned int ip,unsigned short port)
 {
 
 	memset(at_cmd_conn,0,50);
+#ifdef ONE_CLIENT
+	sprintf(at_cmd_conn,"AT+QIOPEN=\"TCP\",\"%d.%d.%d.%d\",%d\r\n",ip>>24,(ip>>16)&0xff,(ip>>8)&0xff,ip&0xff,port);
+#else
 	sprintf(at_cmd_conn,"AT+QIOPEN=%d,\"TCP\",\"%d.%d.%d.%d\",%d\r\n",num,ip>>24,(ip>>16)&0xff,(ip>>8)&0xff,ip&0xff,port);
+#endif	
 
+	//
 	gprs_uart_send_string(at_cmd_conn);
 	debug(at_cmd_conn);
 
@@ -356,7 +367,7 @@ void gprs_status_set(void)
 
 	if(gprs_stat.error_need_to_reboot >0)  //需要复位模块 先检查gprs数据是否发送干净
 	{
-		if(get_sec_count() - gprs_stat.error_need_to_reboot_sec > 30)  //30秒都没法完 认为发送失败
+		if(get_sec_count() - gprs_stat.error_need_to_reboot_sec > 30 || gprs_stat.error_code == GPRS_ERROR_START_ERROR)  //30秒都没法完 认为发送失败
 		{
 			if(gprs_stat.error_need_to_reboot == 1)
 				error_to_stop_gprs_mod();
@@ -368,7 +379,11 @@ void gprs_status_set(void)
 			return;	
 		}
 		memset(at_cmd_conn,0,50);
-		sprintf(at_cmd_conn,AT_CMD_AT_QISACK,0);		
+#ifdef ONE_CLIENT		
+		sprintf(at_cmd_conn,AT_CMD_AT_QISACK);	
+#else
+		sprintf(at_cmd_conn,AT_CMD_AT_QISACK,0);
+#endif		
 		gprs_uart_send_string(at_cmd_conn);	
 		gprs_stat.send_next_at_cmd_time_ms = get_ms_count() + 1000;
 		return;
@@ -377,15 +392,15 @@ void gprs_status_set(void)
 	if(gprs_stat.start_enable != 1)  //未开机 不做处理
 		return;
 
-	if(gprs_stat.power_status !=1)  //开机模块自动发送一些指令，收到后记录为已开始工作
-	{
-		if(get_sec_count() - gprs_stat.start_sec_count >10) //超时未启动
-		{
-			gprs_stat.error_code = GPRS_ERROR_START_ERROR;
-			goto PWR_OFF_MOD;
-		}
-		return;
-	}
+//	if(gprs_stat.power_status !=1)  //开机模块自动发送一些指令，收到后记录为已开始工作
+//	{
+//		if(get_sec_count() - gprs_stat.start_sec_count >10) //超时未启动
+//		{
+//			gprs_stat.error_code = GPRS_ERROR_START_ERROR;
+//			goto PWR_OFF_MOD;
+//		}
+//		return;
+//	}
 
 
 	
@@ -497,7 +512,11 @@ void gprs_status_set(void)
 				}  
 
 				memset(at_cmd_conn,0,50);
-				sprintf(at_cmd_conn,AT_CMD_AT_SEND,0,gprs_stat.con_client[0].send_data_len);
+#ifdef	ONE_CLIENT			
+				sprintf(at_cmd_conn,AT_CMD_AT_SEND,gprs_stat.con_client[0].send_data_len);
+#else
+				sprintf(at_cmd_conn,AT_CMD_AT_SEND,0,gprs_stat.con_client[0].send_data_len);				
+#endif
 				gprs_uart_send_string(at_cmd_conn);	
 				debug(at_cmd_conn);
 				
@@ -522,7 +541,11 @@ void gprs_status_set(void)
 						goto PWR_OFF_MOD;						
 					}
 					memset(at_cmd_conn,0,50);
+#ifdef	ONE_CLIENT					
+					sprintf(at_cmd_conn,AT_CMD_AT_CLOSE_CONNECT);
+#else					
 					sprintf(at_cmd_conn,AT_CMD_AT_CLOSE_CONNECT,0);
+#endif					
 					gprs_uart_send_string(at_cmd_conn);	
 					gprs_stat.send_next_at_cmd_time_ms = get_ms_count()+2000;   //间隔2秒					
 				}
@@ -605,7 +628,11 @@ int32_t gprs_send_data(uint8_t client,void *pdata,uint16_t len,int32_t *cmd)
 void gprs_get_aisack(void)
 {
 		memset(at_cmd_conn,0,50);
-		sprintf(at_cmd_conn,AT_CMD_AT_QISACK,0);		
+#ifdef ONE_CLIENT		
+		sprintf(at_cmd_conn,AT_CMD_AT_QISACK);	
+#else
+		sprintf(at_cmd_conn,AT_CMD_AT_QISACK,0);
+#endif				
 		gprs_uart_send_string(at_cmd_conn);		
 }
 
@@ -629,6 +656,7 @@ void callback_fun_at_ok(const char *pstr)
 		gprs_stat.send_at_cmd_times = 0;
 		gprs_stat.send_next_at_cmd_time_ms = 0;
 		start_str = "4g_get:ati ok\r\n";
+		gprs_uart_send_string("ATE0\r\n");
 	}
 	else
 		start_str = "4g_get:ok\r\n";
@@ -673,7 +701,7 @@ void callback_fun_csq(const char *pstr)
 	{
 		gprs_stat.send_at_cmd_times = 0;
 		gprs_stat.send_next_at_cmd_time_ms = 0;
-
+		adc_data_param.dev_2g_rssi = param;
 		sprintf(debug_send_buff,"4g_get:csq=%d good\r\n",param);
 		debug(debug_send_buff);			
 	}
@@ -776,12 +804,21 @@ void callback_fun_receive(const char *pstr)
 {
 	uint32_t client,len;
 
+#ifdef ONE_CLIENT	
+	if(pstr[0] != 0)
+		sscanf(pstr,"%d",&len);
+	
+	gprs_stat.rev_len = len;
+	gprs_stat.rev_client = 0;
+	sprintf(debug_send_buff,"4g_get:receive %d len=%d\r\n",client,len);
+#else
 	if(pstr[0] != 0)
 		sscanf(pstr,"%d,%d",&client,&len);
 	
 	gprs_stat.rev_len = len;
 	gprs_stat.rev_client = client;
 	sprintf(debug_send_buff,"4g_get:receive %d len=%d\r\n",client,len);
+#endif	
 	debug(debug_send_buff);	
 }
 
@@ -858,6 +895,7 @@ void callback_fun_sms_ready(const char *pstr)
 void callback_fun_cgatt(const char *pstr)
 {
 	uint32_t param;
+	//uint32_t delay = 10000;
 	
 	if(pstr[0] != 0)
 		sscanf(pstr,"%d",&param);
@@ -866,6 +904,7 @@ void callback_fun_cgatt(const char *pstr)
 	{
 		gprs_stat.cgatt_ok = 1;
 		debug("4g_get:+cagtt = 1\r\n");	
+		//while(delay--);
 		gprs_uart_send_string(AT_CMD_AT_QIMUX); 
 		gprs_stat.send_next_at_cmd_time_ms = get_ms_count()+100;   
 	}

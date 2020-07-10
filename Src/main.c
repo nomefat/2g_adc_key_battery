@@ -28,6 +28,7 @@
 #include "gprs_comm.h"
 #include "debug_uart.h"
 #include "rtc.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -128,7 +129,7 @@ int main(void)
   MX_TIM4_Init();
   MX_CRC_Init();
   /* USER CODE BEGIN 2 */
-	
+	//cc();
 	read_param();
 	
 	start_from_gprs_dma_receive();

@@ -24,6 +24,7 @@ struct _cmd_list{
 
 #define GPRS_CONNECT_FAIL_TIMEOUT   2
 
+//#define ONE_CLIENT              //仅支持单链接
 
 
 #define AT_CMD_ATI             "ATI\r\n"          //AT指令 判断GSM模块是否启动
@@ -31,11 +32,22 @@ struct _cmd_list{
 #define AT_CMD_AT_CREG  			"AT+CREG?\r\n"    //GSM网络是否注册    +CREG: 0,1  // <stat>=1,GSM网络已经注册上
 #define AT_CMD_AT_CGREG       "AT+CGREG?\r\n"   //GPRS网络是否注册   +CGREG: 0,1    // <stat>=1,GPRS网络已经注册上
 #define AT_CMD_AT_SET_BAUD    "AT+IPR=115200&W\r\n"   //配置固定波特率
-#define AT_CMD_AT_QIMUX       "AT+QIMUX=1\r\n"   //配置多链接模式
+
+#ifdef ONE_CLIENT
+	#define AT_CMD_AT_QIMUX       "AT+QIMUX=0\r\n"   //配置多链接模式
+	#define AT_CMD_AT_SEND         "AT+QISEND=%d\r\n"       //发送数据  连接编号 数量	
+	#define AT_CMD_AT_CLOSE_CONNECT "AT+QICLOSE\r\n"    //关闭指定的tcp链接
+	#define AT_CMD_AT_QISACK      "AT+QISACK\r\n"        //查询发送的数据
+#else
+	#define AT_CMD_AT_QIMUX       "AT+QIMUX=1\r\n"   //配置多链接模式
+	#define AT_CMD_AT_SEND         "AT+QISEND=%d,%d\r\n"       //发送数据  连接编号 数量	
+	#define AT_CMD_AT_QISACK      "AT+QISACK=%d\r\n"        //查询发送的数据
+	#define AT_CMD_AT_CLOSE_CONNECT "AT+QICLOSE=%d\r\n"    //关闭指定的tcp链接
+#endif
+
 #define AT_CMD_AT_QISTAT      "AT+QISTATE\r\n"
-#define AT_CMD_AT_CLOSE_CONNECT "AT+QICLOSE=%d\r\n"    //关闭指定的tcp链接
-#define AT_CMD_AT_QISACK      "AT+QISACK=%d\r\n"        //查询发送的数据
-#define AT_CMD_AT_SEND         "AT+QISEND=%d,%d\r\n"       //发送数据  连接编号 数量
+
+
 #define AT_CMD_AT_CGATT         "AT+CGATT?\r\n"       //gprs 附着
 #define AT_CMD_AT_SET_CGATT         "AT+CGATT=1\r\n"       //gprs 附着
 #define AT_CMD_AT_SET_CGREG       "AT+CGREG=1\r\n" 

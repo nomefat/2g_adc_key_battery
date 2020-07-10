@@ -26,4 +26,9 @@ void task_debug(void);
 	
 void sys_print(void);
 	
+
+
+#define debug(str) copy_string_to_double_buff(str)
+
+
 #endif

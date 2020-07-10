@@ -9,6 +9,11 @@
 #include "debug_uart.h"
 #include "stdio.h"
 #include "communication_protocol_handle.h"
+#include "work_mode.h"
+#include "adc.h"
+
+
+#define debug(str) copy_string_to_double_buff(str)
 
 
 /*
@@ -35,84 +40,11 @@
 	蓝牙模式        ：蓝灯1000ms闪烁
 */
 
-
-#pragma anon_unions
-
-#define PARAM_ADDR (0X08000000+16*1024+200*1024)   	//固件存放地址
-
-#define CHANGE_STOP_MAX_SEND_PACKET_COUNT 10
-#define AUTO_STUDY_MAX_SEND_PACKET_COUNT  200
-
-#define NO_ACTIVATE_MODE_MAX_TIME_MS   					(1000*60*3)      //未激活模式最多持续时间   超时即关机
-#define UPDATA_MODE_MAX_TIME_MS									(1000*60*3)      //升级模式最多持续时间   
-				
 uint8_t power_off_flag = 0;
 extern uint8_t rtc_alarm_minuter;
 uint8_t btn_event = 0;
 
 int8_t start_key_sanf;	
-typedef struct _work_mode
-{
-		uint16_t len;
-		#define LEN_PARAM       10
-		uint16_t crc;
-    struct
-    {
-        uint8_t mode:4;
-        #define NO_ACTIVATE     0                   //未激活模式
-        #define AUTO_STUDY      1                   //自动学习模式
-        #define NORMAL_WORK     2                   //正常工作模式
-			uint8_t dev_stat:4;       					//表示设备是开机还是关机状态
-			#define DEV_RUNING 0                 //开机
-			#define DEV_STOPING 1              //关机
-    };
-    uint8_t dev_check_start_or_stop;           //现在检测到机器是启动还是停止的状态
-        #define MECHINE_START    1
-        #define MECHINE_STOP     2
-    uint8_t change_stop_send_adc_data_packet_count;  //机器停止后上传的包数  大于10次后停止上传
-    uint16_t auto_study_send_adc_data_packet_count;  //自动学习状态上传200包后转为正常工作状态
-	uint8_t nothing;
-	uint32_t adc_data_send_ok_sec;  //记录采样数据发送成功的时刻
-
-
-    struct _no_activate_mode
-    {
-        int8_t send_adc_data_count;                 //发送数据的次数  
-        int8_t send_ok_time_ms;                     //发送成功的时刻， 小于等于0后将会关机 而且 发送成功后等待5秒没有收到应答 将会关机
-        int8_t rev_if_activate_cmd;                 //收到服务器不激活的指令后置一
-			#define NEED_ACTIVATE         0  //需要激活
-			#define ACTIVATE_ING          1  //已经发送激活包 等待激活			
-			#define ACTIVATE_OK           2  //已经激活  还需要发送3包数据
-            #define NO_ACTIVATED          3 //收到服务器不激活的指令
-        int8_t now_steps;
-            #define ADC_DATA_NONE               0
-            #define WAIT_ADC_DATA_SEND_OK       1
-            #define ADC_DATA_SEND_OK            2
-		int8_t dev_self_test;
-			#define NONE_SELF_TEST        0  //无需操作
-			#define NEED_SELF_TEST        1  //需要自测成功
-			#define SELF_TEST_ING         2  //已发送自测数据包 等待服务器 ack
-			#define SELE_TEST_OK          3  //已自测成功    		 	
-    }no_activate_mode;
-
-    struct _auto_study_mode
-    {
-		int8_t now_steps;
-		int8_t ask_server_if_need_cfg;
-		int8_t dev_stop_send_to_server;
-        /* data */
-    }auto_study_mode;
-
-    struct _work_mode_
-    {
-		int8_t now_steps;
-		int8_t ask_server_if_need_cfg;	
-		int8_t dev_stop_send_to_server;			
-        /* data */
-    }normal_work_mode;
-
-}struct_work_mode;
-
 
 struct_work_mode work_mode;
 
@@ -122,6 +54,10 @@ uint8_t updata_mode = 0;  //进入升级模式
 uint32_t updata_mode_start_ms;  //升级模式开始的时间
 
 uint8_t start_ss_check = 0;
+
+
+
+
 /*
 * 功能:未激活模式轮训函数
 
@@ -132,11 +68,12 @@ uint8_t start_ss_check = 0;
 void no_activate_mode_in(void)
 {
     static uint32_t ms = 0;
-		
+	static int8_t sleep_flag = 0;
+
 		if(get_ms_count() < ms)
 			return;
 		
-    if( get_ms_count() > NO_ACTIVATE_MODE_MAX_TIME_MS) //超时 
+    if( get_ms_count() > NO_ACTIVATE_MODE_MAX_TIME_MS || sleep_flag == 1) //超时 
 	{
 		if(work_mode.no_activate_mode.rev_if_activate_cmd == ACTIVATE_OK)  //已经激活
 		{
@@ -155,7 +92,7 @@ void no_activate_mode_in(void)
 		else
 		{
 			//亮红灯5秒   
-			//work_mode.dev_stat = DEV_STOPING; //关机
+			work_mode.dev_stat = DEV_STOPING; //关机
 			ms = get_ms_count();	
 			power_off_flag = 1;
 			led_ctrl(LED_R,LED_ON);
@@ -169,7 +106,7 @@ void no_activate_mode_in(void)
     else if(work_mode.no_activate_mode.rev_if_activate_cmd == NO_ACTIVATED) //接收到不激活的指令
     {
         //亮蓝灯5秒   
-		//work_mode.dev_stat = DEV_STOPING; //关机
+		work_mode.dev_stat = DEV_STOPING; //关机
         ms = get_ms_count();
 		power_off_flag = 1;
         led_ctrl(LED_B,LED_ON);
@@ -181,72 +118,141 @@ void no_activate_mode_in(void)
     }
     else if(work_mode.no_activate_mode.dev_self_test == NEED_SELF_TEST) //需要自测
     {
-
-	}
-    else if(work_mode.no_activate_mode.dev_self_test == SELF_TEST_ING) //等待服务器响应
-    {
-
-	}
-    else if(work_mode.no_activate_mode.dev_self_test == SELE_TEST_OK) //自测OK 进行激活
-    {
-		if(work_mode.no_activate_mode.rev_if_activate_cmd == NEED_ACTIVATE) //需要激活
-		{
-
-		}
-		else if(work_mode.no_activate_mode.rev_if_activate_cmd == ACTIVATE_ING) //等待激活响应
-		{
-
-		} 
-		else if(work_mode.no_activate_mode.rev_if_activate_cmd == NO_ACTIVATED) //已经激活
-		{
-
-		} 		
-	}
-
-
-
-
-    else if(work_mode.no_activate_mode.send_adc_data_count > 0)//激活的过程
-    {
         if(work_mode.no_activate_mode.now_steps == ADC_DATA_NONE) // 获取ADC数据 启动2g模块
         {
-            start_2g_send_adc_data_task();
+            start_2g_send_adc_data_task(DEV_2G_SEND_SELF_TEST_ADC_DATA,ADC_DATA_TYPE_SELF_TEST);
             work_mode.no_activate_mode.now_steps = WAIT_ADC_DATA_SEND_OK;
         }
         else if(work_mode.no_activate_mode.now_steps == WAIT_ADC_DATA_SEND_OK)  //等待发送成功
         {
             if(SEND_OK == get_2g_send_adc_data_stat())
             {
-
-                work_mode.no_activate_mode.now_steps = ADC_DATA_SEND_OK;
+                work_mode.no_activate_mode.dev_self_test = SELF_TEST_ING;
+				ms = get_ms_count();
             }
         }
-        else if(work_mode.no_activate_mode.now_steps == ADC_DATA_SEND_OK)    //sendok 
-        {
-            work_mode.no_activate_mode.send_adc_data_count--;
-            work_mode.no_activate_mode.now_steps = ADC_DATA_NONE;
-            if( work_mode.no_activate_mode.send_adc_data_count<=0) //发送完成
-            {
-                work_mode.no_activate_mode.send_adc_data_count = -1;
-                if(work_mode.no_activate_mode.rev_if_activate_cmd == ACTIVATE_OK)  //已经激活
-                {
-									//不在这里处理  收到服务器的服务完成ack包后在处理
-//                    work_mode.mode = AUTO_STUDY;
-//                    rtc_alarm_minuter = 30;
-//                    //亮绿灯5秒   
-//                    ms = get_ms_count();
-//										power_off_flag = 1;
-//                    led_ctrl(LED_G,LED_ON);
-//                    while(get_ms_count() < (ms+5000));
-//                    led_ctrl(LED_G,LED_OFF);
-//                    enter_standby();  //睡眠                
-                }
-            }
-        }     
-    }
+	}
+    else if(work_mode.no_activate_mode.dev_self_test == SELF_TEST_ING) //等待服务器自测响应
+    {
+		if(get_ms_count() > (ms+10000)) //10秒 没有响应进行重发
+		{
+			work_mode.no_activate_mode.now_steps = ADC_DATA_NONE;
+			work_mode.no_activate_mode.dev_self_test = NEED_SELF_TEST;
+		}
+	}
+    else if(work_mode.no_activate_mode.dev_self_test == SELE_TEST_OK) //自测OK 进行激活
+    {
+		if(work_mode.no_activate_mode.rev_if_activate_cmd == NEED_ACTIVATE) //需要激活
+		{
+			if(work_mode.no_activate_mode.now_steps == ADC_DATA_NONE) // 发送激活请求包
+			{
+				send_to_server_activate_data();
+				work_mode.no_activate_mode.now_steps = WAIT_ADC_DATA_SEND_OK;
+			}
+			else if(work_mode.no_activate_mode.now_steps == WAIT_ADC_DATA_SEND_OK)  //等待发送成功
+			{
+				if(SEND_OK == get_2g_send_activate_data_stat())
+				{
+					work_mode.no_activate_mode.rev_if_activate_cmd = ACTIVATE_ING;
+					ms = get_ms_count();
+				}
+			}
+		}
+		else if(work_mode.no_activate_mode.rev_if_activate_cmd == ACTIVATE_ING) //等待激活响应
+		{
+			if(get_ms_count() > (ms+10000)) //10秒 没有响应进行重发
+			{
+				work_mode.no_activate_mode.now_steps = ADC_DATA_NONE;
+				work_mode.no_activate_mode.rev_if_activate_cmd = NEED_ACTIVATE;
+			}
+		} 
+		else if(work_mode.no_activate_mode.rev_if_activate_cmd == ACTIVATE_OK) //已经激活
+		{
+			if(work_mode.no_activate_mode.send_adc_data_count > 0)//激活后发数据过程
+			{
+				if(work_mode.no_activate_mode.now_steps == ADC_DATA_NONE) // 获取ADC数据 启动2g模块
+				{
+					start_2g_send_adc_data_task(DEV_2G_SEND_ADC_DATA,ADC_DATA_TYPE_SELF_TEST);
+					work_mode.no_activate_mode.now_steps = WAIT_ADC_DATA_SEND_OK;
+				}
+				else if(work_mode.no_activate_mode.now_steps == WAIT_ADC_DATA_SEND_OK)  //等待发送成功
+				{
+					if(SEND_OK == get_2g_send_adc_data_stat())
+					{
+						ms = get_ms_count();
+						work_mode.no_activate_mode.now_steps = ADC_DATA_SEND_OK;
+					}
+				}
+				else if(work_mode.no_activate_mode.now_steps == ADC_DATA_SEND_OK)    //sendok 
+				{
+					if(get_ms_count() > (ms+10000)) //10秒 没有响应进行重发
+					{
+						work_mode.no_activate_mode.now_steps = ADC_DATA_NONE;
+					}
+				}     
+			}
+			else
+			{
+				//sleep_flag = 1;
+			}
+			
+		} 		
+	}
+
+
+
+
+
     
     
 }
+
+//
+void get_server_self_test_ok(void)
+{
+	work_mode.no_activate_mode.dev_self_test = SELE_TEST_OK;
+	work_mode.no_activate_mode.now_steps = ADC_DATA_NONE;
+	debug("get_server:self test ok\r\n");
+}
+
+//激活OK  切状态  使能发三包数据
+void get_server_activate_ok(void *pdata)
+{
+	struct_activate_packet_ack *p_activate_packet_ack = (struct_activate_packet_ack *)pdata;
+
+	work_mode.no_activate_mode.rev_if_activate_cmd = ACTIVATE_OK;
+	work_mode.no_activate_mode.now_steps = ADC_DATA_NONE;
+	work_mode.no_activate_mode.send_adc_data_count = 3;
+	adjust_datetime_from_sec(to_small_endian_uint32(p_activate_packet_ack->server_time_sec));
+
+	sprintf(debug_send_buff,"get_server:activate ok unix_time=%d band_type=%d auto_study_count=%d timer_time=%d\r\n",
+		to_small_endian_uint32(p_activate_packet_ack->server_time_sec),to_small_endian_uint16(p_activate_packet_ack->band_dev_type),
+		to_small_endian_uint16(p_activate_packet_ack->auto_study_send_packet_count),to_small_endian_uint16(p_activate_packet_ack->timer_send_adc_data));
+	debug(debug_send_buff);
+	print_date_time();
+}
+
+//服务器拒绝激活  切状态  
+void get_server_activate_faild(void)
+{
+	work_mode.no_activate_mode.rev_if_activate_cmd = NO_ACTIVATED;
+	work_mode.no_activate_mode.now_steps = ADC_DATA_NONE;
+	work_mode.no_activate_mode.send_adc_data_count = 0;
+	debug("get_server:activate faild\r\n");
+}
+
+//激活OK  服务器收到3包adc采集数据中的一包 所给的ack
+void get_server_activate_ok_adc_data_ack(void)
+{
+	work_mode.no_activate_mode.now_steps = ADC_DATA_NONE;
+	work_mode.no_activate_mode.send_adc_data_count--;
+	debug("get_server:activate adc data ack\r\n");
+}
+
+
+
+
+
 
 
 
@@ -259,7 +265,14 @@ void no_activate_mode_in(void)
 */
 void auto_study_mode_in(void)
 {
+	static uint32_t ms = 0;
+
     rtc_alarm_minuter = 30;    
+	ms = get_ms_count();
+	if(ms >30000)
+	{
+		enter_standby();  //睡眠 		
+	}
 }
 
 
@@ -372,12 +385,12 @@ void sys_status_led_flash(void)
     else if(work_mode.mode == AUTO_STUDY ||work_mode.no_activate_mode.rev_if_activate_cmd == ACTIVATE_OK)
     {
         if(sys_time.ms_count%500 == 0)
-            led_flash(LED_R);
+            led_flash(LED_G);
     }
     else if(work_mode.mode == NORMAL_WORK)
     {
         if(sys_time.ms_count%1500 == 0)
-            led_flash(LED_R);
+            led_flash(LED_G);
     }
 }
 
@@ -591,6 +604,7 @@ void enter_standby(void)
 	{
 		work_mode.mode = AUTO_STUDY;		
 	}
+	
 	if_need_write_param();
 	if_need_write_param();
 	if_need_write_param();	

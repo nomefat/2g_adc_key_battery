@@ -30,7 +30,13 @@ typedef struct _adc_data
 int32_t make_adc_protocal_data(void);
 
 
+uint16_t to_big_endian_uint16(uint16_t d);
 
+uint32_t to_big_endian_uint32(uint32_t d);
+
+uint16_t to_small_endian_uint16(uint16_t d);
+
+uint32_t to_small_endian_uint32(uint32_t d);
 
 
 
